@@ -138,5 +138,3 @@ function payco_link($params) {
 return $code;
 }
 ?>
-
-
