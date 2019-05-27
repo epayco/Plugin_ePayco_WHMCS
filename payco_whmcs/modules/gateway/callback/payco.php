@@ -1,12 +1,10 @@
 <?php
-
-
 #Required File Includes
 require_once __DIR__ . '/../../../init.php';
 require_once __DIR__ . '/../../../includes/gatewayfunctions.php';
 require_once __DIR__ . '/../../../includes/invoicefunctions.php';
 
-$gatewaymodule = "payco"; 
+$gatewaymodule = "payco";
 $GATEWAY       = getGatewayVariables($gatewaymodule);
 
 #se reciben las variables de respuesta
@@ -24,31 +22,26 @@ $x_extra2               = $_REQUEST["x_extra2"];
 $x_extra3               = $_REQUEST["x_extra3"];
 
 $invoicearr  = explode(':', $x_id_factura);
-$invoiceint  = (int)end($invoicearr);  
+$invoiceint  = (int)end($invoicearr);
 
 #Checks invoice ID is a valid invoice number or ends processing
-$invoiceid = checkCbInvoiceID($invoiceint,$GATEWAY["name"]); 
+$invoiceid = checkCbInvoiceID($invoiceint,$GATEWAY["name"]);
 
 #Checks transaction number isn't already in the database and ends processing if it does
 
-$checkTransId=checkCbTransID($x_ref_payco); 
+$checkTransId=checkCbTransID($x_ref_payco);
 $fee=0;
 
 if ($x_respuesta=="Aceptada") {
-
-    #Successful: Save to Gateway Log: name, data array, status        
-    addInvoicePayment($invoiceid,$x_ref_payco,$amount,$fee,$gatewaymodule); 
-    logTransaction($GATEWAY["name"],$_POST,"Successful"); 
-    
+    #Successful: Save to Gateway Log: name, data array, status
+    addInvoicePayment($invoiceid,$x_ref_payco,$amount,$fee,$gatewaymodule);
+    logTransaction($GATEWAY["name"],$_POST,"Successful");
 } else {
-
-    #Unsuccessful : Save to Gateway Log: name, data array, status
-    logTransaction($GATEWAY["name"],$_POST,"Unsuccessful");
+	#Unsuccessful : Save to Gateway Log: name, data array, status
+	logTransaction($GATEWAY["name"],$_POST,"Unsuccessful");
 }
 
-#redirect 
-
+#redirect
 header('Location: '.$GATEWAY["systemurl"].'/viewinvoice.php?id='.$invoiceid);
 
-    
 ?>
