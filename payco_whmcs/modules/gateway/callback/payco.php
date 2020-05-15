@@ -34,12 +34,14 @@ $invoiceid = checkCbInvoiceID($invoiceint,$GATEWAY["name"]);
 $checkTransId=checkCbTransID($x_ref_payco); 
 $fee=0;
 
-if ($x_respuesta=="Aceptada") {
+$invoice = localAPI("getinvoice", array('invoiceid' => $_REQUEST['x_id_invoice']), $GATEWAY["name"]);
 
+if ($x_respuesta=="Aceptada") {
+    if($invoice['status'] != 'Paid'){
     #Successful: Save to Gateway Log: name, data array, status        
     addInvoicePayment($invoiceid,$x_ref_payco,$amount,$fee,$gatewaymodule); 
     logTransaction($GATEWAY["name"],$_POST,"Successful"); 
-    
+    }
 } else {
 
     #Unsuccessful : Save to Gateway Log: name, data array, status
