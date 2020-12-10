@@ -1,142 +1,179 @@
 <?php
-  
-function payco_config() {
-    
-     $configarray = array(
-         
-     "FriendlyName"      => array("Type"   => "System", 
-                                   "Value" => "Payco"
-                                  ),       
-         
-     "p_cust_id_cliente" => array("FriendlyName"  => "p_cust_id_cliente", 
-                                   "Type"         => "text",
-                                   "Size"         => "20",
-                                   "Description"  => "Ej. <b>0001</b> Se encuentra en el men&uacute; derecho superior en la opci&oacute;n <b>llave secreta</b>"
-                                   ),             
-         
-     "p_key"             => array("FriendlyName"  => "p_key", 
-                                   "Type"         => "text", 
-                                   "Size"         => "50",
-                                   "Description"  => "Ej. <b>8ce71c3cb1732788</b> Se encuentra en el men&uacute; derecho superior en la opci&oacute;n <b>llave secreta</b>"
-                                  ),
-         
-      "p_cliente"        => array("FriendlyName"  => "p_cliente", 
-                                   "Type"         => "text", 
-                                   "Size"         => "20",
-                                   "Description"  => "Corresponde al documento registrado en el men&uacute; derecho superior en la opci&oacute;n <b>Mis Datos</b>."                                 
-                                   ),
-                    
-     "p_test_request"    => array("FriendlyName"  => "p_test_request (Modo de Pruebas)",
-                                   "Type"         => "yesno",
-                                   "Description"  => "Al estar habilitado todas las transacciones ser&aacute;n procesadas en modo de pruebas."
-                                 ),
-   
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+
+function epayco_MetaData()
+{
+    return array(
+        'DisplayName' => 'ePayco',
+        'APIVersion' => '1.1', // Use API Version 1.1
+        'DisableLocalCredtCardInput' => true,
+        'TokenisedStorage' => false,
     );
-   
-	
-    return $configarray;
+}
+
+function epayco_config(){
+
+    $usersWithApiAccess = epayco_getAdminUserWithApiAccess();
+
+    $usersWithApiAccessArray = array();
+    foreach($usersWithApiAccess as $userWithApiAccess){
+        $usersWithApiAccessArray[$userWithApiAccess->username] = $userWithApiAccess->username;
+    }
+
+    $countryList = epayco_loadCountries();
+
+    return array(
+        'FriendlyName' => array(
+            'Type' => 'System',
+            'Value' => 'ePayco',
+        ),
+        'customerID' => array(
+            'FriendlyName' => 'P_CUST_ID_CLIENTE',
+            'Type' => 'text',
+            'Size' => '32',
+            'Default' => '',
+            'Description' => '<br/>ID de cliente que lo representa en la plataforma. es Proporcionado en su panel de clientes en la opción configuración.',
+        ),
+        'publicKey' => array(
+            'FriendlyName' => 'PUBLIC_KEY',
+            'Type' => 'text',
+            'Size' => '32',
+            'Default' => '',
+            'Description' => '<br/>Corresponde a la llave de autenticación en el API Rest, Proporcionado en su panel de clientes en la opción configuración.',
+        ),
+        'privateKey' => array(
+            'FriendlyName' => 'P_KEY',
+            'Type' => 'text',
+            'Size' => '32',
+            'Default' => '',
+            'Description' => '<br/>Corresponde a la llave transacción de su cuenta, Proporcionado en su panel de clientes en la opción configuración.',
+        ),
+        'countryCode' => array(
+            'FriendlyName' => 'País del comercio',
+            'Type' => 'dropdown',
+            'Options' => $countryList,
+            'Description' => 'País en el cual se encuentra el comercio',
+        ),
+        'currencyCode' => array(
+            'FriendlyName' => 'Moneda',
+            'Type' => 'dropdown',
+            'Options' => array(
+                'default' => 'Moneda del cliente',
+                'cop' => 'Peso colombiano (COP)',
+                'usd' => 'Dolar estadounidense (USD)'
+            ),
+            'Description' => '<br/>Moneda de las transacciones.',
+        ),
+        'testMode' => array(
+            'FriendlyName' => 'Modo de pruebas',
+            'Type' => 'yesno',
+            'Description' => 'Habilite para activar el modo de pruebas',
+        ),
+        'externalMode' => array(
+            'FriendlyName' => 'Standar checkout',
+            'Type' => 'yesno',
+            'Description' => 'Redirija a la pasarela de pagos',
+        ),
+        'WHMCSAdminUser' => array(
+            'FriendlyName' => 'Usuario administrador WHMCS',
+            'Type' => 'dropdown',
+            'Options' => $usersWithApiAccessArray,
+            'Description' => 'Usuario administrador de WHMCS con permisos de acceso al API',
+        ),
+    );
+}
+
+function epayco_link($params){
+
+    if(strpos($_SERVER['PHP_SELF'], 'viewinvoice.php') === false){
+        return "";
+    }
+
+    $countryCode = $params['countryCode'];
+
+    if($params['currencyCode'] == 'default'){
+        $clientDetails = localAPI("getclientsdetails", ["clientid" => $params['clientdetails']['userid'], "responsetype" => "json"], $params['WHMCSAdminUser']);
+        $currencyCode = strtolower($clientDetails['currency_code']);
+    }else {
+        $currencyCode = $params['currencyCode'];
+    }
+
+    $testMode = $params['testMode'] == 'on' ? 'true' : 'false';
+
+    $externalMode = $params['externalMode'] == 'on' ? 'true' : 'false';
     
+    $invoice = localAPI("getinvoice", array('invoiceid' => $params['invoiceid']), $params['WHMCSAdminUser']);
+
+    $description = epayco_getChargeDescription($invoice['items']['item']);
+
+    $confirmationUrl = $params['systemurl'].'/modules/gateways/callback/epayco.php';
+    return sprintf('<form>
+                <script src="https://checkout.epayco.co/checkout.js"
+                class="epayco-button"
+                data-epayco-key="%s"
+                data-epayco-amount="%s"
+                data-epayco-name="%s"
+                data-epayco-description="%s"
+                data-epayco-currency="%s"
+                data-epayco-test="%s"
+                data-epayco-invoice="%s"
+                data-epayco-country="%s"
+                data-epayco-response="%s"
+                data-epayco-confirmation="%s"
+                data-epayco-external="%s"
+                >
+            </script>
+        </form>
+    ', $params['publicKey'], $params['amount'], $description, $description,strtolower($currencyCode), $testMode, $params['invoiceid'], $countryCode, $confirmationUrl, $confirmationUrl, $externalMode);
 }
 
-function payco_link($params) {
-        
-	# Gateway Specific Variables
-	$p_cust_id_cliente  = $params['p_cust_id_cliente'];
-	$p_cliente          = $params['p_cliente'];
-	$p_key              = $params['p_key'];
-	$x_key              = sha1($p_key.$p_cust_id_cliente);
-	$p_test_request     = $params['p_test_request'];	
-        	 
-	# Invoice Variables
-	$invoiceid   = $params['invoiceid'];	
-        $amount      = $params['amount']; # Format: ##.##
-        $currency    = $params['currency']; # Currency Code
- 
-	# Client Variables
-	$userID    = $params['clientdetails']["userid"];
-	$firstname = $params['clientdetails']['firstname'];
-	$lastname  = $params['clientdetails']['lastname'];
-	$email     = $params['clientdetails']['email'];
-	$address1  = $params['clientdetails']['address1'];	
-	$city      = $params['clientdetails']['city'];
-	$state     = $params['clientdetails']['state'];
-	$postcode  = $params['clientdetails']['postcode'];
-	$country   = $params['clientdetails']['country'];
-	$phone     = $params['clientdetails']['phonenumber'];
-	
-	# System Variables
-	$companyname       = $params['companyname'];
-	$systemurl         = $params['systemurl'];	
-  $p_url_respuesta   = $systemurl.'/modules/gateways/callback/payco.php';
-  $actionform        = 'https://secure.payco.co/payment.php';
-                
-	# Form Api 
-        
-  if ($p_test_request=='on') {      
-      $p_test_request = 'TRUE';      
-  }else {      
-      $p_test_request = 'FALSE';
-  }
-                  
-  $ip_cliente = $_SERVER['REMOTE_ADDR'];
-
-   //consultar la orden con el id de la factura
-   $o_table   = "tblorders";
-   $o_fields  = "id";
-   $o_where   = array("invoiceid" => $invoiceid);
-   $o_result  = select_query($o_table, $o_fields, $o_where);
-   $o_data      = mysql_fetch_array($o_result);
-   $orderid   = $o_data['id'];
-
-   //consultar items de la factura         
-   $f_table   = "tblinvoiceitems";
-   $f_fields  = "description";
-   $f_where   = array("invoiceid" => $invoiceid);         
-   $f_result  = select_query($f_table, $f_fields, $f_where);
-   
-   $descrip   = "";
-   
-   while ($f_data = mysql_fetch_array($f_result)) {
-      
-      $descrip .= $f_data['description'].", ";
-     
-   }
-
-    $description = substr($descrip, 0 , -2);
-
-    $code = '<form name="frmpago" action="'.$actionform.'" method="POST">
-              <input name="p_cust_id_cliente" type="hidden" value="'.$p_cust_id_cliente.'" />               
-              <input name="p_key" type="hidden" value="'.$x_key.'" />
-              <input name="p_cliente" type="hidden" value="'.$p_cliente.'" />
-              <input name="p_test_request" type="hidden" value="'.$p_test_request.'" />
-              <input name="p_description" type="hidden" value="'.$description.'" />
-              <input name="p_amount" type="hidden" value="'.$amount.'" />
-              <input name="p_id_factura" type="hidden" value="Orden de Compra Nro:'.$orderid.' / Fact Nro:'.$invoiceid.'" />
-              <input name="p_amount_base" type="hidden" value="0" />
-              <input name="p_tax" type="hidden" value="0" />
-              <input name="p_billing_name" type="hidden" value="'.$firstname.'" />
-              <input name="p_billing_lastname" type="hidden" value="'.$lastname.'" />
-              <input name="p_billing_address" type="hidden" value="'.$address1.'" />
-              <input name="p_billing_country" type="hidden" value="'.$country.'" />
-              <input name="p_billing_state" type="hidden" value="'.$state.'" />
-              <input name="p_billing_postcode" type="hidden" value="'.$postcode.'" />
-              <input name="p_billing_city" type="hidden" value="'.$city.'" />
-              <input name="p_billing_email" type="hidden" value="'.$email.'" />
-              <input name="p_billing_phone" type="hidden" value="'.$phone.'" />
-              <input name="p_currency_code" type="hidden" value="'.$currency.'" />
-              <input name="p_customer_ip" type="hidden" value="'.$ip_cliente.'" />
-              <input name="p_url_respuesta" type="hidden" value="'.$p_url_respuesta.'" />
-              <input name="p_url_confirmacion" type="hidden" value="'.$p_url_respuesta.'" />
-              <input name="p_company" type="hidden" value="'.$companyname.'" />
-              <input name="p_systemurl" type="hidden" value="'.$systemurl.'" />
-              <input name="p_extra1" type="hidden" value="" />
-              <input name="p_extra2" type="hidden" value="" />
-              <input name="p_extra3" type="hidden" value="" />   
-              <input type="image" name="imageField" id="imageField" src="https://payco.co/img/btnpago.png"/>
-      </form> <br>';
-
-return $code;
+function epayco_getAdminUserWithApiAccess(){
+    try {
+        return Capsule::table('tbladmins')
+            ->join('tbladminroles', 'tbladmins.roleid', '=', 'tbladmins.roleid')
+            ->join('tbladminperms', 'tbladminroles.id', '=', 'tbladminperms.roleid')
+            ->select('tbladmins.username')
+            ->where('tbladmins.disabled', '=', 0)
+            ->where('tbladminperms.permid', '=', 81)
+            ->get();
+    }catch (\Exception $e){
+        logActivity("Stripe Suscriptions Addon error in method ". __FUNCTION__.' in '. __FILE__."(".__LINE__."): ".$e->getMessage());
+    }
+    return false;
 }
-?>
 
+function epayco_getChargeDescription($invoceItems){
+    $descriptions = array();
+    foreach($invoceItems as $item){
+        $descriptions[] = $item['description'];
+    }
 
+    return implode(' - ', $descriptions);
+}
+
+function epayco_loadCountries()
+{
+    $countriesJsonString = file_get_contents(__DIR__.'/../../resources/country/dist.countries.json');
+    $countriesJson = json_decode($countriesJsonString);
+    $countries = array();
+    foreach($countriesJson as $code => $country){
+        $countries[$code] = $country->name;
+    }
+
+    if(file_exists(__DIR__.'/../../resources/country/countries.json')){
+        $customCountriesJsonString = file_get_contents(__DIR__.'/../../resources/country/countries.json');
+        $customCountriesJson = json_decode($customCountriesJsonString);
+        foreach($customCountriesJson as $code => $country){
+
+            if($country === false){
+                unset($countries[$code]);
+                break;
+            }
+
+            $countries[$code] = $country->name;
+        }
+    }
+
+    return $countries;
+}
