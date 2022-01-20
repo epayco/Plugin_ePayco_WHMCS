@@ -1,12 +1,4 @@
 <?php
-
-class EnumTransaccion {
-    const Aceptada = 1;
-    const Rechazada = 2;
-    const Pendiente = 3;
-    const Fallida = 4;
-}
-
 require_once __DIR__ . '/../../../init.php';
 require_once __DIR__ . '/../../../includes/gatewayfunctions.php';
 require_once __DIR__ . '/../../../includes/invoicefunctions.php';
