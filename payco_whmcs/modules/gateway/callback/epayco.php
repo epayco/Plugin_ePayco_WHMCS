@@ -13,14 +13,15 @@ if (!$gatewayParams['type']) {
 $confirmation = false;
 $async = true;
 if(!empty($_GET['ref_payco'])){
-    $responseData = @file_get_contents('https://secure.epayco.co/validation/v1/reference/'.$_GET['ref_payco']);
+    $responseData = @file_get_contents('https://secure.epayco.io/validation/v1/reference/'.$_GET['ref_payco']);
     if($responseData === false){
         logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
         header("Location: ".$gatewayParams['systemurl']);
     }
     $jsonData = @json_decode($responseData, true);
-    if($jsonData === false){
-        logTransaction($gatewayParams['name'], $_GET, 'El formato de la respuesta de validaci車n no es correcto');
+
+    if($jsonData["status"] === false){
+        logTransaction($gatewayParams['name'], $_GET, 'El formato de la respuesta de validación no es correcto');
         header("Location: ".$gatewayParams['systemurl']);
     }
     $validationData = $jsonData['data'];
@@ -30,17 +31,6 @@ if(!empty($_GET['ref_payco'])){
 }
 
 if (!empty(trim($_POST['x_ref_payco']))) {
-      $responseData = @file_get_contents('https://secure.payco.co/pasarela/estadotransaccion?id_transaccion='.trim($_POST['x_ref_payco']));
-    if($responseData === false){
-        logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
-        header("Location: ".$gatewayParams['systemurl']);
-    }
-    $jsonData = @json_decode($responseData, true);
-      if($jsonData === false){
-        logTransaction($gatewayParams['name'], $_POST, 'El formato de la respuesta de validaci車n no es correcto');
-        header("Location: ".$gatewayParams['systemurl']);
-    }
-     //$validationData = $jsonData['data'];
      $validationData = $_POST;
      $async = false;
      $confirmation= true;
@@ -81,7 +71,7 @@ $isTestTransaction = $x_test_request == 'TRUE' ? "yes" : "no";
 $isTestMode = $isTestTransaction == "yes" ? "true" : "false";
 $isTestPluginMode = $gatewayParams["testMode"] == "on" ? "yes": "no";
 $x_amount= $validationData['x_amount'];
-if(floatval($invoiceAmount) == floatval($x_amount)){
+if(floatval($invoiceAmount) === floatval($x_amount)){
     if("yes" == $isTestPluginMode){
         $validation = true;
     }
@@ -124,7 +114,7 @@ $signature = hash('sha256',
 );
 
 if($signature == $validationData['x_signature'] && $validation){
-         switch ((int)$validationData['x_cod_response']) {
+    switch ((int)$validationData['x_cod_response']) {
         case 1:{
             if($invoice['status'] != 'Paid'){
             addInvoicePayment(
@@ -143,7 +133,7 @@ if($signature == $validationData['x_signature'] && $validation){
                     header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
                 }
             }
-             echo "1 <br>";
+             echo "1: ";
         }break;
         case 2:{
             logTransaction($gatewayParams['name'], $validationData, "Cancelled");
@@ -152,7 +142,7 @@ if($signature == $validationData['x_signature'] && $validation){
             }
             if(!$async){
                 if($confirmation){
-                    echo "2 <br>";
+                    echo "2: ";
                 }else{
                     $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
                     if(!$confirmation){
@@ -162,15 +152,13 @@ if($signature == $validationData['x_signature'] && $validation){
             }
         }break;
         case 3:{
-            logTransaction($gatewayParams['name'], $validationData, "Pendiente");
-            if(!$async){
-                $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                if(!$confirmation){
+            $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
+            if(!$confirmation){
                 header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                }
-                echo "3 <br>";
+            }else{
                 $results = localAPI('PendingOrder', $postData, $adminUsername);
             }
+            echo "3: ";
         }break;
         case 4:{
             logTransaction($gatewayParams['name'], $validationData, "Failure");
@@ -179,7 +167,7 @@ if($signature == $validationData['x_signature'] && $validation){
             }
             if(!$async){
                 if($confirmation){
-                    echo "Fallida <br>";
+                    echo "Fallida: ";
                 }else{
                      $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
                     if(!$confirmation){
@@ -195,7 +183,7 @@ if($signature == $validationData['x_signature'] && $validation){
             }
             if(!$async){
                 if($confirmation){
-                    echo "Fallida <br>";
+                    echo "Fallida: ";
                 }else{
                      $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
                     if(!$confirmation){
@@ -211,7 +199,7 @@ if($signature == $validationData['x_signature'] && $validation){
             }
             if(!$async){
                 if($confirmation){
-                    echo "10 <br>";
+                    echo "10: ";
                 }else{
                      $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
                     if(!$confirmation){
@@ -227,7 +215,7 @@ if($signature == $validationData['x_signature'] && $validation){
             }
             if(!$async){
                 if($confirmation){
-                    echo "11 <br>";
+                    echo "11: ";
                 }else{
                      $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
                     if(!$confirmation){
@@ -238,16 +226,25 @@ if($signature == $validationData['x_signature'] && $validation){
         }break;
     }
 }else{
-    logTransaction($gatewayParams['name'], $_GET, 'Firma no valida');
+    logTransaction($gatewayParams['name'], $validationData, 'Firma no valida');
+
     if($invoice['status'] != 'Cancelled'){
+        $results_ = localAPI('PendingOrder', $postData, $adminUsername);
+        if($results_["result"] != "error"){
         $results = localAPI($command, $postData, $adminUsername);
+        }
     }
     if(!$async){
         if($confirmation){
-            echo "Firma no valida <br>";
+            echo "Firma no valida. ";
         }else{
             header("Location: ".$gatewayParams['systemurl']);
         }
     }
 }
-print_r($results);
+
+if($results["result"] == "error"){
+    echo $results["result"].": ".$results["message"];
+}else{
+   echo $results["result"]; 
+}
