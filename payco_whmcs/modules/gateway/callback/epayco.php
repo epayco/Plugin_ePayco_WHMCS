@@ -13,7 +13,7 @@ if (!$gatewayParams['type']) {
 $confirmation = false;
 $async = true;
 if(!empty($_GET['ref_payco'])){
-    $responseData = @file_get_contents('https://secure.epayco.io/validation/v1/reference/'.$_GET['ref_payco']);
+    $responseData = @file_get_contents('https://secure.epayco.co/validation/v1/reference/'.$_GET['ref_payco']);
     if($responseData === false){
         logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
         header("Location: ".$gatewayParams['systemurl']);
@@ -63,7 +63,7 @@ if($invoice['status'] != 'Unpaid'){
 
 $invoiceData = Capsule::table('tblorders')
             ->select('tblorders.amount')
-            ->where('tblorders.id', '=', $validationData['x_extra1'])
+            ->where('tblorders.invoiceid', '=', $validationData['x_extra1'])
             ->get();
 $invoiceAmount = $invoiceData[0]->amount;
 $x_test_request= $validationData['x_test_request'];
