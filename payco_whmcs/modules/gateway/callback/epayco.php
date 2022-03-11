@@ -63,7 +63,7 @@ if($invoice['status'] != 'Unpaid'){
 
 $invoiceData = Capsule::table('tblorders')
             ->select('tblorders.amount')
-            ->where('tblorders.id', '=', $validationData['x_extra1'])
+            ->where('tblorders.invoiceid', '=', $validationData['x_extra1'])
             ->get();
 $invoiceAmount = $invoiceData[0]->amount;
 $x_test_request= $validationData['x_test_request'];
