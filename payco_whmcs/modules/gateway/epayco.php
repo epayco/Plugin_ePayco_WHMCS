@@ -107,8 +107,12 @@ function epayco_link($params){
     $testMode = $params['testMode'] == 'on' ? 'true' : 'false';
 
     $externalMode = $params['externalMode'] == 'on' ? 'true' : 'false';
-    
+
     $invoice = localAPI("getinvoice", array('invoiceid' => $params['invoiceid']), $params['WHMCSAdminUser']);
+    $invoiceData = Capsule::table('tblorders')
+        ->select('tblorders.id')
+        ->where('tblorders.invoiceid', '=', $params['invoiceid'])
+        ->get();
 
     $description = epayco_getChargeDescription($invoice['items']['item']);
     if(floatval($invoice["subtotal"]) > 0.0 ){
@@ -143,6 +147,7 @@ function epayco_link($params){
                 data-epayco-name-billing="%s"
                 data-epayco-address-billing="%s"
                 data-epayco-extra1="%s"
+                data-epayco-extra2="%s"
                 >
             </script>
             
@@ -161,7 +166,7 @@ function epayco_link($params){
                 });
             </script>
         </form>
-    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $params['invoiceid'], $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid']);
+    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $invoiceData[0]->id, $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid'],$invoiceData[0]->id);
 }
 
 function epayco_getAdminUserWithApiAccess(){
