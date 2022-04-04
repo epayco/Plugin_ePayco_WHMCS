@@ -166,7 +166,7 @@ function epayco_link($params){
                 });
             </script>
         </form>
-    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $invoiceData[0]->id, $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid'],$invoiceData[0]->id);
+    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $params['invoiceid'], $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid'],$invoiceData[0]->id);
 }
 
 function epayco_getAdminUserWithApiAccess(){
