@@ -137,7 +137,7 @@ function epayco_link($params){
                 data-epayco-description="%s"
                 data-epayco-currency="%s"
                 data-epayco-test="%s"
-                data-epayco-invoice="Order # %s"
+                data-epayco-invoice="Factura # %s"
                 data-epayco-country="%s"
                 data-epayco-response="%s"
                 data-epayco-confirmation="%s"
