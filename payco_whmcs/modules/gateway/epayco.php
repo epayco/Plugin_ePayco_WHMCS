@@ -107,8 +107,12 @@ function epayco_link($params){
     $testMode = $params['testMode'] == 'on' ? 'true' : 'false';
 
     $externalMode = $params['externalMode'] == 'on' ? 'true' : 'false';
-    
+
     $invoice = localAPI("getinvoice", array('invoiceid' => $params['invoiceid']), $params['WHMCSAdminUser']);
+    $invoiceData = Capsule::table('tblorders')
+        ->select('tblorders.id')
+        ->where('tblorders.invoiceid', '=', $params['invoiceid'])
+        ->get();
 
     $description = epayco_getChargeDescription($invoice['items']['item']);
     if(floatval($invoice["subtotal"]) > 0.0 ){
@@ -123,7 +127,7 @@ function epayco_link($params){
 
     $confirmationUrl = $params['systemurl'].'/modules/gateways/callback/epayco.php';
     return sprintf('<form>
-                <script src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js?version=1643645084821"
+                <script src="https://checkout.epayco.co/checkout.js"
                 class="epayco-button"
                 data-epayco-key="%s"
                 data-epayco-amount="%s"
@@ -133,7 +137,7 @@ function epayco_link($params){
                 data-epayco-description="%s"
                 data-epayco-currency="%s"
                 data-epayco-test="%s"
-                data-epayco-invoice="Order # %s"
+                data-epayco-invoice="%s"
                 data-epayco-country="%s"
                 data-epayco-response="%s"
                 data-epayco-confirmation="%s"
@@ -143,6 +147,7 @@ function epayco_link($params){
                 data-epayco-name-billing="%s"
                 data-epayco-address-billing="%s"
                 data-epayco-extra1="%s"
+                data-epayco-extra2="%s"
                 >
             </script>
             
@@ -161,7 +166,7 @@ function epayco_link($params){
                 });
             </script>
         </form>
-    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $params['invoiceid'], $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid']);
+    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $params['invoiceid'], $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid'],$invoiceData[0]->id);
 }
 
 function epayco_getAdminUserWithApiAccess(){

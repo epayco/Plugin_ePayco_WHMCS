@@ -4,6 +4,8 @@
 
 
 ## Versiones
+* [ePayco plugin WHMCS v8.1.0](https://github.com/epayco/Plugin_ePayco_WHMCS/releases/tag/v8.1.0).
+* [ePayco plugin WHMCS v8.0.0](https://github.com/epayco/Plugin_ePayco_WHMCS/releases/tag/v8.0.0).
 * [ePayco plugin WHMCS v7.10.x](https://github.com/epayco/Plugin_ePayco_WHMCS/releases/tag/v7.10).
 * [ePayco plugin WHMCS v7.0.x](https://github.com/epayco/Plugin_ePayco_WHMCS/releases/tag/7.0.x).
 * [ePayco plugin WHMCS v6.2.0](https://github.com/epayco/Plugin_ePayco_WHMCS/releases/tag/6.2.0).
