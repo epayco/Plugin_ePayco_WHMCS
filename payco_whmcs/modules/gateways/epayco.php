@@ -127,7 +127,7 @@ function epayco_link($params){
 
     $confirmationUrl = $params['systemurl'].'/modules/gateways/callback/epayco.php';
     return sprintf('<form>
-                <script src="https://checkout.epayco.co/checkout.js"
+                <script src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js"
                 class="epayco-button"
                 data-epayco-key="%s"
                 data-epayco-amount="%s"
@@ -148,6 +148,7 @@ function epayco_link($params){
                 data-epayco-address-billing="%s"
                 data-epayco-extra1="%s"
                 data-epayco-extra2="%s"
+                data-epayco-autoclick="true"
                 >
             </script>
             
