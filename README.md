@@ -26,7 +26,7 @@ git clone https://github.com/epayco/Plugin_ePayco_WHMCS.git
 cd payco_whmcs
 cp . -R /ruta/de/su/instalacion/whmcs/
 ```
-3- Dirigirse a la ruta de instalación de su whmcs ruta/de/su/instalacion/whmcs/modules/gateways/ y asegurarceque los archivos descargados se encuentre el la ruta correspondiente
+3- Dirigirse a la ruta de instalación de su whmcs ruta/de/su/instalacion/whmcs/modules/gateways/ y asegurarse que los archivos descargados se encuentre el la ruta correspondiente
 ```
 * ruta/de/su/instalacion/whmcs/modules/gateways/epayco.php
 * ruta/de/su/instalacion/whmcs/modules/gateways/epayco/epayco.php
