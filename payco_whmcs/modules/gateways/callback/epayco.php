@@ -119,7 +119,7 @@ $signature = hash('sha256',
 if($signature == $validationData['x_signature'] && $validation){
     switch ((int)$validationData['x_cod_response']) {
         case 1:{
-            if($invoice['status'] != 'Paid'){
+            if($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled'){
                 addInvoicePayment(
                     $invoice['invoiceid'],
                     $validationData['x_ref_payco'],
@@ -129,6 +129,58 @@ if($signature == $validationData['x_signature'] && $validation){
                 );
                 logTransaction($gatewayParams['name'], $validationData, "Aceptada");
                 $results = localAPI('AcceptOrder', $postData, $adminUsername);
+            }else{
+                if($invoice['status'] == 'Cancelled'){
+                    
+                $productsOrder = Capsule::table('tblinvoiceitems')
+                    ->select('tblinvoiceitems.description')
+                    ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
+                    ->where('tblinvoiceitems.type', '=', 'Hosting')
+                    ->get();
+                foreach ($productsOrder as $productOrder )
+                {
+                    $explodProduct = explode(' - ', $productOrder->description, 2);
+                    $productInfo[] = $explodProduct[0]; 
+                }
+                
+                $products = Capsule::table('tblproducts')
+                    ->whereIn('name', $productInfo)
+                    ->get(['name', 'qty'])
+                    ->all();
+                
+                for($i=0; $i<count($products); $i++ ){
+                    $productData[$i]["name"] = $products[$i]->name;
+                    $productData[$i]["qty"] =  $products[$i]->qty-1;
+                } 
+                 
+                for($j=0; $j<count($productData); $j++ ){
+                   $connection = Capsule::table('tblproducts')
+                    ->where('name',"=", $productData[$j]["name"])
+                    ->update(['qty'=> $productData[$j]["qty"]]); 
+                } 
+
+                $results = localAPI('PendingOrder', $postData, $adminUsername);
+                    addInvoicePayment(
+                    $invoice['invoiceid'],
+                    $validationData['x_ref_payco'],
+                    $invoice['total'],
+                    null,
+                    $gatewayParams['paymentmethod']
+                );
+                 logTransaction($gatewayParams['name'], $validationData, "Aceptada");
+                $results = localAPI('AcceptOrder', $postData, $adminUsername);
+                
+                $results = localAPI(
+                        'AddInvoicePayment', array(
+                        'orderid' => $validationData['x_extra2']+1,
+                        'transid' => $validationData['x_ref_payco'],
+                        'gateway' =>  $gatewayParams['paymentmethod']
+                    ), $adminUsername);
+                logTransaction($gatewayParams['name'], $validationData, "Aceptada");
+                $results = localAPI('AcceptOrder',  array(
+                        'orderid' => $validationData['x_extra2']+1,
+                    ), $adminUsername);
+                }
             }
             if(!$async){
                 $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
