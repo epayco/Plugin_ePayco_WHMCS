@@ -207,6 +207,34 @@ if($signature == $validationData['x_signature'] && $validation){
             }
         }break;
         case 3:{
+            if($invoice['status'] == 'Cancelled'){
+                $productsOrder = Capsule::table('tblinvoiceitems')
+                    ->select('tblinvoiceitems.description')
+                    ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
+                    ->where('tblinvoiceitems.type', '=', 'Hosting')
+                    ->get();
+                foreach ($productsOrder as $productOrder )
+                {
+                    $explodProduct = explode(' - ', $productOrder->description, 2);
+                    $productInfo[] = $explodProduct[0]; 
+                }
+                
+                $products = Capsule::table('tblproducts')
+                    ->whereIn('name', $productInfo)
+                    ->get(['name', 'qty'])
+                    ->all();
+                
+                for($i=0; $i<count($products); $i++ ){
+                    $productData[$i]["name"] = $products[$i]->name;
+                    $productData[$i]["qty"] =  $products[$i]->qty-1;
+                } 
+                var_dump($productData);
+                for($j=0; $j<count($productData); $j++ ){
+                   Capsule::table('tblproducts')
+                    ->where('name',"=", $productData[$j]["name"])
+                    ->update(['qty'=> $productData[$j]["qty"]]);
+                } 
+            }
             $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
             if(!$confirmation){
                 header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
