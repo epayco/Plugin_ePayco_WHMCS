@@ -228,7 +228,7 @@ if($signature == $validationData['x_signature'] && $validation){
                     $productData[$i]["name"] = $products[$i]->name;
                     $productData[$i]["qty"] =  $products[$i]->qty-1;
                 } 
-                var_dump($productData);
+                
                 for($j=0; $j<count($productData); $j++ ){
                    Capsule::table('tblproducts')
                     ->where('name',"=", $productData[$j]["name"])
