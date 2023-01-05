@@ -148,7 +148,6 @@ function epayco_link($params){
                 data-epayco-address-billing="%s"
                 data-epayco-extra1="%s"
                 data-epayco-extra2="%s"
-                data-epayco-autoclick="true"
                 >
             </script>
             
