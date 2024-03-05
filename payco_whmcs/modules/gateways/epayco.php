@@ -43,6 +43,13 @@ function epayco_config(){
             'Description' => '<br/>Corresponde a la llave de autenticación en el API Rest, Proporcionado en su panel de clientes en la opción configuración.',
         ),
         'privateKey' => array(
+            'FriendlyName' => 'PRIVATE_KEY',
+            'Type' => 'text',
+            'Size' => '32',
+            'Default' => '',
+            'Description' => '<br/>Corresponde a la llave de autenticación en el API Rest, Proporcionado en su panel de clientes en la opción configuración.',
+        ),
+        'p_key' => array(
             'FriendlyName' => 'P_KEY',
             'Type' => 'text',
             'Size' => '32',
@@ -64,6 +71,15 @@ function epayco_config(){
                 'usd' => 'Dolar estadounidense (USD)'
             ),
             'Description' => '<br/>Moneda de las transacciones.',
+        ),
+        'lang' => array(
+            'FriendlyName' => 'Lenguaje',
+            'Type' => 'dropdown',
+            'Options' => array(
+                'es' => 'Español',
+                'en' => 'Ingles'
+            ),
+            'Description' => '<br/>lenguaje checkout.',
         ),
         'testMode' => array(
             'FriendlyName' => 'Modo de pruebas',
@@ -126,32 +142,101 @@ function epayco_link($params){
     }
 
     $confirmationUrl = $params['systemurl'].'/modules/gateways/callback/epayco.php';
-    return sprintf('<form>
-                <script src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js"
-                class="epayco-button"
-                data-epayco-key="%s"
-                data-epayco-amount="%s"
-                data-epayco-tax-base="%s"
-                data-epayco-tax="%s"
-                data-epayco-name="%s"
-                data-epayco-description="%s"
-                data-epayco-currency="%s"
-                data-epayco-test="%s"
-                data-epayco-invoice="%s"
-                data-epayco-country="%s"
-                data-epayco-response="%s"
-                data-epayco-confirmation="%s"
-                data-epayco-external="%s"
-                data-epayco-button="https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color1.png"
-                data-epayco-email-billing="%s"
-                data-epayco-name-billing="%s"
-                data-epayco-address-billing="%s"
-                data-epayco-extra1="%s"
-                data-epayco-extra2="%s"
-                >
+    $lang = $params['lang'];
+    if ($lang === "en") {
+        $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color-Ingles.png';
+    }else{
+        $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color1.png';
+    }
+    $ip=getCustomerIp();
+    return sprintf('
+            <p>       
+                <center>
+                <a id="btn_epayco" href="#">
+                    <img src="'.$epaycoButtonImage.'">
+                </a>
+                </center> 
+            </p>
+            <script
+                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js">
             </script>
-            
             <script>
+                var data = {
+                    amount: "%s".toString(),
+                    tax_base: "%s".toString(),
+                    tax: "%s".toString(),
+                    name: "%s",
+                    description: "%s",
+                    currency: "%s",
+                    test: "%s".toString(),
+                    invoice: "%s",
+                    country: "%s",
+                    response: "%s",
+                    confirmation: "%s",
+                    external: "%s",
+                    email_billing: "%s",
+                    name_billing: "%s",
+                    address_billing: "%s",
+                    extra1: "%s",
+                    extra2: "%s",
+                    lang: "%s",
+                    ip: "%s",
+                    taxIco: "0".toString(),
+                    autoclick: "true",
+                    extras_epayco:{extra5:"P34"}
+                }
+                const apiKey = "%s";
+                const privateKey = "%s";
+                var openNewChekout = function () {
+                    if(localStorage.getItem("invoicePayment") == null){
+                        localStorage.setItem("invoicePayment", data.invoice);
+                        makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
+                    }else{
+                        if(localStorage.getItem("invoicePayment") != data.invoice){
+                            localStorage.removeItem("invoicePayment");
+                            localStorage.setItem("invoicePayment", data.invoice);
+                            makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
+                        }else{
+                            makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
+                        }
+                    }
+                }
+                var makePayment = function (privatekey, apikey, info, external) {
+                    const headers = { "Content-Type": "application/json" } ;
+                    headers["privatekey"] = privatekey;
+                    headers["apikey"] = apikey;
+                    var payment =   function (){
+                        return  fetch("https://cms.epayco.io/checkout/payment/session", {
+                            method: "POST",
+                            body: JSON.stringify(info),
+                            headers
+                        })
+                            .then(res =>  res.json())
+                            .catch(err => err);
+                    }
+                    payment()
+                        .then(session => {
+                            if(session.data.sessionId != undefined){
+                                localStorage.removeItem("sessionPayment");
+                                localStorage.setItem("sessionPayment", session.data.sessionId);
+                                const handlerNew = window.ePayco.checkout.configure({
+                                    sessionId: session.data.sessionId,
+                                    external: external,
+                                });
+                                handlerNew.openNew()
+                            }
+                        })
+                        .catch(error => {
+                            error.message;
+                        });
+                }
+                var openChekout = function () {
+                    //handler.open(data);
+                    openNewChekout()
+                }
+                var bntPagar = document.getElementById("btn_epayco");
+                bntPagar.addEventListener("click", openChekout);
+                openChekout()
                 window.onload = function() {
                     document.addEventListener("contextmenu", function(e){
                         e.preventDefault();
@@ -166,7 +251,28 @@ function epayco_link($params){
                 });
             </script>
         </form>
-    ', $params['publicKey'], $amount,$sub_total,$tax, $description, $description,strtolower($currencyCode), $testMode, $params['invoiceid'], $countryCode, $confirmationUrl, $confirmationUrl, $externalMode, $email, $billing_name, $address1,$params['invoiceid'],$invoiceData[0]->id);
+    ',  $amount,
+        $sub_total,
+        $tax,
+        $description, 
+        $description,
+        strtolower($currencyCode), 
+        $testMode, 
+        $params['invoiceid'], 
+        $countryCode, 
+        $confirmationUrl, 
+        $confirmationUrl, 
+        $externalMode, 
+        $email, 
+        $billing_name, 
+        $address1,
+        $params['invoiceid'],
+        $invoiceData[0]->id,
+        $lang,
+        $ip,
+        $params['publicKey'],
+        $params['privateKey']
+    );
 }
 
 function epayco_getAdminUserWithApiAccess(){
@@ -217,4 +323,25 @@ function epayco_loadCountries()
     }
 
     return $countries;
+}
+
+function getCustomerIp(){
+    $ipaddress = '';
+    if (isset($_SERVER['HTTP_CLIENT_IP']))
+        $ipaddress = $_SERVER['HTTP_CLIENT_IP'];
+    else if(isset($_SERVER['HTTP_X_FORWARDED_FOR']))
+        $ipaddress = $_SERVER['HTTP_X_FORWARDED_FOR'];
+    else if(isset($_SERVER['HTTP_X_FORWARDED']))
+        $ipaddress = $_SERVER['HTTP_X_FORWARDED'];
+    else if(isset($_SERVER['HTTP_X_CLUSTER_CLIENT_IP']))
+        $ipaddress = $_SERVER['HTTP_X_CLUSTER_CLIENT_IP'];
+    else if(isset($_SERVER['HTTP_FORWARDED_FOR']))
+        $ipaddress = $_SERVER['HTTP_FORWARDED_FOR'];
+    else if(isset($_SERVER['HTTP_FORWARDED']))
+        $ipaddress = $_SERVER['HTTP_FORWARDED'];
+    else if(isset($_SERVER['REMOTE_ADDR']))
+        $ipaddress = $_SERVER['REMOTE_ADDR'];
+    else
+        $ipaddress = 'UNKNOWN';
+    return $ipaddress;
 }

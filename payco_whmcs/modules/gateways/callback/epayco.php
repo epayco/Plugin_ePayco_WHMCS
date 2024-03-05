@@ -109,7 +109,7 @@ $adminUsername = $data[0]->username;
 
 $signature = hash('sha256',
     $gatewayParams['customerID'].'^'
-    .$gatewayParams['privateKey'].'^'
+    .$gatewayParams['p_key'].'^'
     .$validationData['x_ref_payco'].'^'
     .$validationData['x_transaction_id'].'^'
     .$validationData['x_amount'].'^'
@@ -228,7 +228,7 @@ if($signature == $validationData['x_signature'] && $validation){
                     $productData[$i]["name"] = $products[$i]->name;
                     $productData[$i]["qty"] =  $products[$i]->qty-1;
                 } 
-                var_dump($productData);
+                
                 for($j=0; $j<count($productData); $j++ ){
                    Capsule::table('tblproducts')
                     ->where('name',"=", $productData[$j]["name"])
