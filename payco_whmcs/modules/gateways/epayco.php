@@ -158,9 +158,13 @@ function epayco_link($params){
                 </center> 
             </p>
             <script
-                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js">
+                src="https://checkout.epayco.co/checkout.js">
             </script>
             <script>
+                var handler = ePayco.checkout.configure({
+                        key: "%s",
+                        test: "%s"
+                    })
                 var data = {
                     amount: "%s".toString(),
                     tax_base: "%s".toString(),
@@ -206,7 +210,7 @@ function epayco_link($params){
                     headers["privatekey"] = privatekey;
                     headers["apikey"] = apikey;
                     var payment =   function (){
-                        return  fetch("https://cms.epayco.io/checkout/payment/session", {
+                        return  fetch("https://cms.epayco.co/checkout/payment/session", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
@@ -224,6 +228,8 @@ function epayco_link($params){
                                     external: external,
                                 });
                                 handlerNew.openNew()
+                            }else{
+                                handler.open(data);
                             }
                         })
                         .catch(error => {
@@ -251,7 +257,10 @@ function epayco_link($params){
                 });
             </script>
         </form>
-    ',  $amount,
+    ',  
+        $params['publicKey'],
+        $testMode,
+        $amount,
         $sub_total,
         $tax,
         $description, 
@@ -285,7 +294,7 @@ function epayco_getAdminUserWithApiAccess(){
             ->where('tbladminperms.permid', '=', 81)
             ->get();
     }catch (\Exception $e){
-        logActivity("Stripe Suscriptions Addon error in method ". __FUNCTION__.' in '. __FILE__."(".__LINE__."): ".$e->getMessage());
+        logActivity("ePayco Suscriptions Addon error in method ". __FUNCTION__.' in '. __FILE__."(".__LINE__."): ".$e->getMessage());
     }
     return false;
 }
