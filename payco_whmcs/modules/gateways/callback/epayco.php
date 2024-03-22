@@ -109,7 +109,7 @@ $adminUsername = $data[0]->username;
 
 $signature = hash('sha256',
     $gatewayParams['customerID'].'^'
-    .$gatewayParams['privateKey'].'^'
+    .$gatewayParams['p_key'].'^'
     .$validationData['x_ref_payco'].'^'
     .$validationData['x_transaction_id'].'^'
     .$validationData['x_amount'].'^'
