@@ -158,7 +158,7 @@ function epayco_link($params){
                 </center> 
             </p>
             <script
-                src="https://checkout.epayco.co/checkout.js">
+                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js">
             </script>
             <script>
                 var handler = ePayco.checkout.configure({
@@ -210,7 +210,7 @@ function epayco_link($params){
                     headers["privatekey"] = privatekey;
                     headers["apikey"] = apikey;
                     var payment =   function (){
-                        return  fetch("https://cms.epayco.co/checkout/payment/session", {
+                        return  fetch("https://cms.epayco.io/checkout/payment/session", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
@@ -242,7 +242,7 @@ function epayco_link($params){
                 }
                 var bntPagar = document.getElementById("btn_epayco");
                 bntPagar.addEventListener("click", openChekout);
-                openChekout()
+                //openChekout()
                 window.onload = function() {
                     document.addEventListener("contextmenu", function(e){
                         e.preventDefault();
