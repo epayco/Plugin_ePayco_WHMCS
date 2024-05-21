@@ -242,7 +242,7 @@ function epayco_link($params){
                 }
                 var bntPagar = document.getElementById("btn_epayco");
                 bntPagar.addEventListener("click", openChekout);
-                openChekout()
+                //openChekout()
                 window.onload = function() {
                     document.addEventListener("contextmenu", function(e){
                         e.preventDefault();
