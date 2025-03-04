@@ -1,6 +1,7 @@
 <?php
 use Illuminate\Database\Capsule\Manager as Capsule;
 require_once(__DIR__ . "/idioma.php");
+use WHMCS\Exception;
 class EpaycoConfig
 { 
     public $nombreModulo;
@@ -20,6 +21,7 @@ class EpaycoConfig
                     $table->string("transaccion")->unique();
                     $table->dateTime("momento");
                     $table->string("gateway");
+                    $table->string("refPayco");
                 });
                 return true;
             } catch(\Exception $ex) {
@@ -74,6 +76,12 @@ class EpaycoConfig
         $modulo = $this->modulo;
         $nombre = $this->nombreModulo;
         $idioma = $this->checkIdioma();
+        $usersWithApiAccess = $this->epayco_getAdminUserWithApiAccess();
+
+        $usersWithApiAccessArray = array();
+        foreach($usersWithApiAccess as $userWithApiAccess){
+            $usersWithApiAccessArray[$userWithApiAccess->username] = $userWithApiAccess->username;
+        }
         $configHeader = array(
                 "FriendlyName" => array(
                     "Type" => "System", 
@@ -142,18 +150,18 @@ class EpaycoConfig
                     'Type' => 'yesno',
                     'Description' => traduccionEpayco($idioma, "epconfig_17"),
                 ),
-                "bh_texto" => array(
+                /*"bh_texto" => array(
                     "FriendlyName" => "" . traduccionEpayco($idioma, "epconfig_22") . "", 
                     "Type" => "text", 
                     "Value" => traduccionEpayco($idioma, "epconfig_23")
-                ),
+                ),*/
                 "bh_nota" => array(
                     "FriendlyName" => traduccionEpayco($idioma, "epconfig_20") . ":", 
                     "Type" => "text", 
                     "Size" => "100", 
                     "Description" => "<br>" . traduccionEpayco($idioma, "epconfig_21")
                 ),
-                "color" => array(
+                /*"color" => array(
                     "FriendlyName" => traduccionEpayco($idioma, "epconfig_24") . ":", 
                     "Type" => "dropdown", 
                     "Options" => array(
@@ -167,8 +175,8 @@ class EpaycoConfig
                         "dark" => traduccionEpayco($idioma, "epconfig_32"), 
                         "link" => traduccionEpayco($idioma, "epconfig_33")
                     ), "Description" => traduccionEpayco($idioma, "epconfig_34")
-                  ),
-                  "bh_modocolaprocesamiento" => array(
+                ),*/
+                "bh_modocolaprocesamiento" => array(
                     "FriendlyName" => traduccionEpayco($idioma, "epconfig_35") . ":", 
                     "Type" => "yesno", 
                     "Description" => traduccionEpayco($idioma, "epconfig_36")
@@ -246,7 +254,7 @@ class EpaycoConfig
             $amount = $params["amount"];
         }
     
-        $confirmationUrl = $systemurl . "modules/gateways/callback/" . $params["paymentmethod"] . "_ipn.php?source_news=webhooks";
+        $confirmationUrl = $systemurl . "modules/gateways/callback/" . $params["paymentmethod"] . ".php?source_news=webhooks";
         $lang = $params['lang'];
         if ($lang === "en") {
             $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color-Ingles.png';
@@ -255,7 +263,7 @@ class EpaycoConfig
         }
         $ip=$this->getCustomerIp(); 
         $logo = $params['systemurl'].'/modules/gateways/epayco/logo.png';
-        $code = "<script src='https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js'></script> <img src=" . $logo . " /><br><a href='" . $enlace . "' class='btn btn-" . $color . "'>" . $bh_texto . "</a>" . $nota;
+        $code = "<img src=" . $logo . " /><br><a href='" . $enlace . "' class='btn btn-" . $color . "'>" . $bh_texto . "</a>" . $nota;
         $code = sprintf('
             <p>       
                 <center>
@@ -265,7 +273,7 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://checkout.epayco.co/checkout.js">
+                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js">
             </script>
             <script>
                 var handler = ePayco.checkout.configure({
@@ -294,7 +302,8 @@ class EpaycoConfig
                     ip: "%s",
                     taxIco: "0".toString(),
                     autoclick: "true",
-                    extras_epayco:{extra5:"P34"}
+                    extras_epayco:{extra5:"P34"},
+                    method_confirmation: "POST"
                 }
                 const apiKey = "%s";
                 const privateKey = "%s";
@@ -317,7 +326,7 @@ class EpaycoConfig
                     headers["privatekey"] = privatekey;
                     headers["apikey"] = apikey;
                     var payment =   function (){
-                        return  fetch("https://cms.epayco.co/checkout/payment/session", {
+                        return  fetch("https://cms.epayco.io/checkout/payment/session", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
@@ -345,7 +354,7 @@ class EpaycoConfig
                 }
                 var openChekout = function () {
                     //handler.open(data);
-                    //openNewChekout()
+                    openNewChekout()
                     console.log(data)
                 }
                 var bntPagar = document.getElementById("btn_epayco");
@@ -403,14 +412,11 @@ class EpaycoConfig
     return implode(' - ', $descriptions);
 }
 
-    function epaycoIPN($gatewayOBJ)
+    function epaycoConfirmation($gatewayOBJ,$informe,$confirmation=false)
     {
         $gatewayModule = $this->modulo;
-        $informe = json_decode(file_get_contents("php://input"), true);
-        $informe_cobro = $informe["data"]["id"];
-        $informe_action = $informe["action"];
-        $informe_id = $informe["id"];
-        $informe_type = $informe["type"];
+        //$informes = json_decode(file_get_contents("php://input"), true);
+        $informe_cobro = $informe['x_extra1'];
         $email = $gatewayOBJ["email"];
         $modoProcesamientoPorColas = $gatewayOBJ["bh_modocolaprocesamiento"] == "on";
         $admin = $gatewayOBJ["useradmin"];
@@ -425,137 +431,295 @@ class EpaycoConfig
             }
         }
         if ($verificamail) {
-            mail($email, $informe_id . " - Start", print_r($informe, true));
+            //mail($email, $informe_id . " - Start", print_r($informe, true));
         }
-        $command = "GetTransactions";
-        $postData = array("transid" => $informe_cobro);
+        $command = "GetInvoice";
+        $postData = array("invoiceid" => (string)$informe_cobro);
         $arr_transacciones = localAPI($command, $postData, $adminUsername);
-        if ($arr_transacciones["totalresults"] == 0) {
-            Capsule::table("bapp_epayco")->insert(array("transaccion" => $informe_cobro, "momento" => date("Y-m-d H:i:s"), "gateway" => $gatewayModule));
+        $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $informe['x_extra1'])->get();
+
+        if ($arr_transacciones["result"] !== 'success' || count($resultado) == 0) {
+            Capsule::table("bapp_epayco")->insert(array("transaccion" => $informe_cobro, "momento" => date("Y-m-d H:i:s"), "gateway" => $gatewayModule, "refPayco" => $informe['x_ref_payco']));
         }
-        if (!$modoProcesamientoPorColas)
-        {
-            $this->callbackEpayco($informe_cobro);
-        }        
+
+        $this->callbackEpayco($informe,$confirmation);
         $retorno = "200";
         return $retorno;
     }
-    function getPaymentEpayco($transaccion,$accessToken)
+    function getPaymentEpayco($gateway, $transaccion)
     {        
-        $url = "https://api.mercadopago.com/v1/payments/" . $transaccion;
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/4.0");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLINFO_HEADER_OUT, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array("Authorization: Bearer " . $accessToken));
-        $result = curl_exec($ch);
-        curl_close($ch);
-        $respuestaParseada = json_decode($result, true);
-        return $respuestaParseada;
-    }
-    function callbackEpayco($idtrans = "")
-    {
-        if (!empty($idtrans)) {
-            $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $idtrans)->get();
-            $mp_id = $resultado[0]->id;
-            $mp_transaccion = $resultado[0]->transaccion;
-            $mp_momento = $resultado[0]->momento;
-            $mp_gateway = $resultado[0]->gateway;
-        } else {
-            $resultado = Capsule::table("bapp_epayco")->first();
-            $mp_id = $resultado->id;
-            $mp_transaccion = $resultado->transaccion;
-            $mp_momento = $resultado->momento;
-            $mp_gateway = $resultado->gateway;
+       $publicKey = $gateway['publicKey'];
+       $url = "https://apify.epayco.co/login";
+       $data = array(
+            'public_key' => $gateway['publicKey'],
+            'private_key' => $gateway['privateKey']
+        );
+        $json =$this->makeRequest($gateway,$data, $url,true);
+        
+        if(is_null($json)) {
+          throw new Exception("Error get bearer_token.");
+        } 
+        
+        $bearer_token = false;
+        if(isset($json->bearer_token)) {
+          $bearer_token=$json->bearer_token;
+        }else if(isset($json->token)){
+          $bearer_token= $json->token;
         }
-        if (!empty($mp_id)) {
-            $log = "ID: " . $mp_id . "<br>Tran: " . $mp_transaccion . "<br>Time: " . $mp_momento . "<br>Gat: " . $mp_gateway;
-            $GATEWAY = getGatewayVariables($mp_gateway);
+        
+        if(!$bearer_token) {
+          $msj = isset($json->message) ? $json->message : "Error get bearer_token";
+          if($msj == "Error get bearer_token" && isset($json->error)){
+              $msj = $json->error;
+          }
+          throw new Exception($msj);
+        }
+          
+        $publicKey = $gateway['publicKey'];
+        $url = "https://secure.epayco.io/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
+        return $this->makeRequest($gateway,[], $url, $bearer_token);
+        
+    }
+    
+    function makeRequest($gateway,$data,$url,$bearerToken = false){
+        $headers["Content-Type"] = 'application/json';
+        if(!$bearerToken){
+            $headers["Accept"] = 'application/json';
+            $headers["Type"] = 'sdk-jwt';
+            $headers["lang"] = 'PHP';
+            $headers["Authorization"] = "Bearer ".$bearerToken;
+        }else{
+            $token = base64_encode($gateway['publicKey'].":".$gateway['privateKey']);
+            $headers["Authorization"] = "Basic ".$token;
+        }
+            try {
+                $jsonData = json_encode($data);
+                $curl = curl_init();
+                curl_setopt_array($curl, array(
+                  CURLOPT_URL => $url,
+                  CURLOPT_RETURNTRANSFER => true,
+                  CURLOPT_ENCODING => '',
+                  CURLOPT_MAXREDIRS => 10,
+                  CURLOPT_TIMEOUT => 0,
+                  CURLOPT_FOLLOWLOCATION => true,
+                  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                  CURLOPT_CUSTOMREQUEST => 'POST',
+                   CURLOPT_POSTFIELDS => $jsonData,
+                  CURLOPT_HTTPHEADER => $headers,
+                ));
+                $resp = curl_exec($curl);
+                if ($resp === false) {
+                    return;
+                }
+                curl_close($curl);
+                return json_decode($resp);
+            } catch(\Exception $ex) {
+                throw new Exception("No se pudo consultar la transaccion: " . $ex->getMessage());
+            }
+
+
+    }
+    function callbackEpayco($idtrans,$confirmation)
+    {
+
+        if($confirmation){
+            if (!empty($idtrans['x_extra1'])) {
+                $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $idtrans['x_extra1'])->get();
+                $mp_id = $resultado[0]->id;
+                $mp_transaccion = $resultado[0]->transaccion;
+                $mp_momento = $resultado[0]->momento;
+                $mp_gateway = $resultado[0]->gateway;
+                $ref_payco = $resultado[0]->refPayco;
+            } else {
+                $resultado = Capsule::table("bapp_epayco")->first();
+                $mp_id = $resultado->id;
+                $mp_transaccion = $resultado->transaccion;
+                $mp_momento = $resultado->momento;
+                $mp_gateway = $resultado->gateway;
+                $ref_payco = $resultado->refPayco;
+            }
+            
+        }else{
+            $mp_transaccion = $idtrans['x_extra1'];
+            $mp_gateway = 'epayco';
+            $ref_payco = $idtrans['x_ref_payco'];
+        }
+        $GATEWAY = getGatewayVariables($mp_gateway);
+ 
+        if (!empty($mp_transaccion)) {
+
             $admin = $GATEWAY["useradmin"];
             if (!empty($admin)) {
                 $adminUsername = $GATEWAY["useradmin"];
             }
-            $command = "GetTransactions";
-            $postData = array("transid" => $mp_transaccion);
-            $arr_transacciones = localAPI($command, $postData, $adminUsername);
-            if ($arr_transacciones["totalresults"] == 0) {
-                $email = $GATEWAY["email"];
-                if (!empty($email)) {
-                    if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                        $verificamail = true;
-                    } else {
-                        $verificamail = false;
-                    }
+
+            $command = "GetInvoice";
+            $postData = array("invoiceid" => $mp_transaccion);
+            $invoice = localAPI($command, $postData, $adminUsername);
+   
+            if ($invoice["result"] == 'success') {
+           
+                if($confirmation){
+                     //$validationData = $this->getPaymentEpayco($GATEWAY,$ref_payco);
+                     $validationData = $idtrans;
+                }else{
+                    $validationData = $idtrans;
                 }
-                if ($verificamail) {
-                    mail($email, "IPN Trans: " . $mp_transaccion, $log);
+                $signature = hash('sha256',
+                 trim($GATEWAY['customerID']).'^'
+                 .trim($GATEWAY['p_key']).'^'
+                 .$idtrans['x_ref_payco'].'^'
+                 .$idtrans['x_transaction_id'].'^'
+                 .$idtrans['x_amount'].'^'
+                 .$idtrans['x_currency_code']
+                );
+                $invoiceData = Capsule::table('tblorders')
+                    ->select('tblorders.amount')
+                    ->where('tblorders.invoiceid', '=', $validationData['x_extra1'])
+                    ->get();
+                $invoiceAmount = $invoiceData[0]->amount;
+                $x_amount= $validationData['x_amount'];
+                if(floatval($invoiceAmount) === floatval($x_amount)){
+                        $validation = true;
+                }else{
+                    $validation = false;
                 }
-                $datosdelpago = $this->getPaymentEpayco($mp_transaccion,$GATEWAY["bh_Access_Token"]);
-                if ($verificamail) {
-                    mail($email, "Search Trans. " . $mp_transaccion, print_r($datosdelpago, true));
-                }
-                $status = $datosdelpago["status"];
-                $idioma = $this->checkIdioma();
-                if ($status == "approved") {
-                    $nrofactura = $datosdelpago["external_reference"];
-                    if (!empty($nrofactura)) {
-                        $moneda_de_cobro = $datosdelpago["currency_id"];
-                        $comision = $datosdelpago["transaction_details"]["total_paid_amount"] - $datosdelpago["transaction_details"]["net_received_amount"];
-                        $command = "GetInvoice";
-                        $postData = array("invoiceid" => $nrofactura);
-                        $arr_datos_factura = localAPI($command, $postData, $adminUsername);
-                        $datos_factura = print_r($arr_datos_factura, true);
-                        $usuario_id = $arr_datos_factura["userid"];
-                        $balance = $arr_datos_factura["balance"];
-                        if ($GATEWAY["bh_comportamiento"] != "normal") {
-                            $importe_pagado = $balance;
-                        } else {
-                            $importe_pagado = $datosdelpago["transaction_details"]["total_paid_amount"];
-                            $command = "GetClientsDetails";
-                            $postData = array("clientid" => $usuario_id);
-                            $arr_datos_cliente = localAPI($command, $postData, $adminUsername);
-                            $moneda_code_usuario = $arr_datos_cliente["currency_code"];
-                            if ($moneda_de_cobro != $moneda_code_usuario) {
-                                $command = "GetCurrencies";
-                                $postData = array();
-                                $arr_listademonedas = localAPI($command, $postData, $adminUsername);
-                                $monedero = $arr_listademonedas["currencies"]["currency"];
-                                foreach ($monedero as $datosmoneda) {
-                                    $moneda_code = $datosmoneda["code"];
-                                    $monedasporcode[$moneda_code] = $datosmoneda["rate"];
+                if($signature == $validationData['x_signature'] && $validation){
+                switch ((int)$validationData['x_cod_response']) {
+                    case 1:{
+                        if($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled'){
+                            addInvoicePayment(
+                                $invoice['invoiceid'],
+                                $validationData['x_ref_payco'],
+                                $invoice['total'],
+                                null,
+                                $GATEWAY['paymentmethod']
+                            );
+                            logTransaction($GATEWAY['name'], $validationData, "Aceptada");
+                            $results = localAPI('AcceptOrder', $postData, $adminUsername);
+                            $command = "AddInvoicePayment";
+                            $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $mp_transaccion, "amount" => $validationData['x_amount']);
+                            $results = localAPI($command, $postData, $adminUsername);
+                            $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
+                        }else{
+                            if($invoice['status'] == 'Cancelled'){
+                                
+                                $productsOrder = Capsule::table('tblinvoiceitems')
+                                    ->select('tblinvoiceitems.description')
+                                    ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
+                                    ->where('tblinvoiceitems.type', '=', 'Hosting')
+                                    ->get();
+                                foreach ($productsOrder as $productOrder )
+                                {
+                                    $explodProduct = explode(' - ', $productOrder->description, 2);
+                                    $productInfo[] = $explodProduct[0]; 
                                 }
-                                $tasadeconversion = $monedasporcode[$moneda_code_usuario];
-                                $ximporte_pagado = round($importe_pagado * $tasadeconversion, 2);
-                                $xcomision = round($comision * $tasadeconversion, 2);
-                                $importe_pagado = $ximporte_pagado;
-                                $comision = $xcomision;
-                                $conversionlog = traduccionEpayco($idioma, "mpconfig_73") . ": " . $moneda_code_usuario . "\r\n                            " . traduccionEpayco($idioma, "mpconfig_74") . ": " . $importe_pagado . "\r\n                            " . traduccionEpayco($idioma, "mpconfig_75") . ": " . $comision;
+                                
+                                $products = Capsule::table('tblproducts')
+                                    ->whereIn('name', $productInfo)
+                                    ->get(['name', 'qty'])
+                                    ->all();
+                                
+                                for($i=0; $i<count($products); $i++ ){
+                                    $productData[$i]["name"] = $products[$i]->name;
+                                    $productData[$i]["qty"] =  $products[$i]->qty-1;
+                                } 
+                                 
+                                for($j=0; $j<count($productData); $j++ ){
+                                   $connection = Capsule::table('tblproducts')
+                                    ->where('name',"=", $productData[$j]["name"])
+                                    ->update(['qty'=> $productData[$j]["qty"]]); 
+                                } 
+                
+                                $results = localAPI('PendingOrder', $postData, $adminUsername);
+                                    addInvoicePayment(
+                                    $invoice['invoiceid'],
+                                    $validationData['x_ref_payco'],
+                                    $invoice['total'],
+                                    null,
+                                    $GATEWAY['paymentmethod']
+                                );
+                                 logTransaction($GATEWAY['name'], $validationData, "Aceptada");
+                                $results = localAPI('AcceptOrder', $postData, $adminUsername);
+                                $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
+                                $command = "AddInvoicePayment";
+                                $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $mp_transaccion, "amount" => $validationData['x_amount']);
+                                $results = localAPI($command, $postData, $adminUsername);
+                                $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
                             }
+       
+   
                         }
-                        $command = "AddInvoicePayment";
-                        $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $nrofactura, "transid" => $mp_transaccion, "amount" => $importe_pagado, "fees" => $comision);
-                        $results = localAPI($command, $postData, $adminUsername);
-                        $texto_log = "\r\n                    " . traduccionEpayco($idioma, "mpconfig_56") . ": " . $nrofactura . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_57") . ": " . $GATEWAY["name"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_58") . ": " . $mp_transaccion . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_60") . ": " . $datosdelpago["authorization_code"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_61") . ": " . $datosdelpago["date_approved"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_62") . ": " . $datosdelpago["payment_type_id"] . " - " . $datosdelpago["payment_method_id"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_63") . ": " . $datosdelpago["currency_id"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_64") . ": " . $datosdelpago["transaction_details"]["total_paid_amount"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_65") . ": " . $datosdelpago["transaction_details"]["net_received_amount"] . "\r\n                    " . $conversionlog;
-                        logTransaction($GATEWAY["name"], $texto_log, traduccionEpayco($idioma, "mpconfig_66") . " [" . $nrofactura . "]");
-                        $resultado = Capsule::table("tbltransaction_history")->where("transaction_id", "=", $mp_transaccion)->delete();
-                    }
-                    $resultado = Capsule::table("bapp_epayco")->where("id", "=", $mp_id)->delete();
-                } else {
-                    if ($status == "pending") {
-                        $command = "UpdateInvoice";
-                        $postData = array("invoiceid" => $datosdelpago["external_reference"], "notes" => date("Y-m-d H:i:s") . ": " . traduccionEpayco($idioma, "mpconfig_76") . "\r\n                        [" . ucwords($datosdelpago["payment_type_id"]) . " - " . ucwords($datosdelpago["payment_method_id"]) . "]");
-                        $results = localAPI($command, $postData, $adminUsername);
-                        $texto_log = "\r\n                    " . traduccionEpayco($idioma, "mpconfig_56") . ": " . $datosdelpago["external_reference"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_57") . ": " . $GATEWAY["name"] . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_58") . ": " . $mp_transaccion . "\r\n                    " . traduccionEpayco($idioma, "mpconfig_62") . ": " . $datosdelpago["payment_type_id"] . " - " . $datosdelpago["payment_method_id"];
-                        logTransaction($GATEWAY["name"], $texto_log, traduccionEpayco($idioma, "mpconfig_76") . " [" . $datosdelpago["external_reference"] . "]");
-                        Capsule::table("tbltransaction_history")->insert(array("invoice_id" => $datosdelpago["external_reference"], "gateway" => $GATEWAY["name"], "updated_at" => date("Y-m-d H:i:s"), "transaction_id" => $mp_transaccion, "remote_status" => traduccionEpayco($idioma, "mpconfig_76"), "description" => $datosdelpago["payment_type_id"] . " - " . $datosdelpago["payment_method_id"]));
-                    }
-                    $resultado = Capsule::table("bapp_epayco")->where("id", "=", $mp_id)->delete();
+                    }break;
+                    case 2:{
+                        logTransaction($GATEWAY['name'], $validationData, "Cancelled");
+                        if($invoice['status'] != 'Cancelled'){
+                            $results = localAPI($command, $postData, $adminUsername);
+                        }
+                    }break;
+                    case 3:{
+                        if($invoice['status'] == 'Cancelled'){
+                            $productsOrder = Capsule::table('tblinvoiceitems')
+                                ->select('tblinvoiceitems.description')
+                                ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
+                                ->where('tblinvoiceitems.type', '=', 'Hosting')
+                                ->get();
+                            foreach ($productsOrder as $productOrder )
+                            {
+                                $explodProduct = explode(' - ', $productOrder->description, 2);
+                                $productInfo[] = $explodProduct[0]; 
+                            }
+                            
+                            $products = Capsule::table('tblproducts')
+                                ->whereIn('name', $productInfo)
+                                ->get(['name', 'qty'])
+                                ->all();
+                            
+                            for($i=0; $i<count($products); $i++ ){
+                                $productData[$i]["name"] = $products[$i]->name;
+                                $productData[$i]["qty"] =  $products[$i]->qty-1;
+                            } 
+                            
+                            for($j=0; $j<count($productData); $j++ ){
+                               Capsule::table('tblproducts')
+                                ->where('name',"=", $productData[$j]["name"])
+                                ->update(['qty'=> $productData[$j]["qty"]]);
+                            } 
+                        }
+                    }break;
+                    case 4:{
+                        logTransaction($GATEWAY['name'], $validationData, "Failure");
+                        if($invoice['status'] != 'Cancelled'){
+                            $results = localAPI($command, $postData, $adminUsername);
+                        }
+                    }break;
+                    case 6:{
+                        logTransaction($GATEWAY['name'], $validationData, "Failure");
+                        if($invoice['status'] != 'Cancelled'){
+                            $results = localAPI($command, $postData, $adminUsername);
+                        }
+                    }break;
+                    case 10:{
+                        logTransaction($GATEWAY['name'], $validationData, "Failure");
+                        if($invoice['status'] != 'Cancelled'){
+                            $results = localAPI($command, $postData, $adminUsername);
+                        }
+                    }break;
+                    case 11:{
+                        logTransaction($GATEWAY['name'], $validationData, "Failure");
+                        if($invoice['status'] != 'Cancelled'){
+                            $results = localAPI($command, $postData, $adminUsername);
+                        }
+                    }break;
+                }
+                }else{
+                    echo "Firma no valida";
                 }
             }
             else
             {
                 //BORRAR PORQUE YA FUE INGRESADA LA TRANSACCION
-                $resultado = Capsule::table("bapp_epayco")->where("id", "=", $mp_id)->delete();
+                $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
             }
         }
         return true;
@@ -564,7 +728,7 @@ class EpaycoConfig
     {
         $resultado = Capsule::table("bapp_epayco")->limit($limiteRegistros)->get();
         foreach ($resultado as $registro) {
-            $this->callbackEpayco($registro->transaccion);
+            $this->callbackEpayco($registro->transaccion, true);
         }
     }
     function epayco_loadCountries()
@@ -612,5 +776,19 @@ class EpaycoConfig
             $ipaddress = 'UNKNOWN';
         return $ipaddress;
     }
+    function epayco_getAdminUserWithApiAccess(){
+    try {
+        return Capsule::table('tbladmins')
+            ->join('tbladminroles', 'tbladmins.roleid', '=', 'tbladmins.roleid')
+            ->join('tbladminperms', 'tbladminroles.id', '=', 'tbladminperms.roleid')
+            ->select('tbladmins.username')
+            ->where('tbladmins.disabled', '=', 0)
+            ->where('tbladminperms.permid', '=', 81)
+            ->get();
+    }catch (\Exception $e){
+        logActivity("ePayco Suscriptions Addon error in method ". __FUNCTION__.' in '. __FILE__."(".__LINE__."): ".$e->getMessage());
+    }
+    return false;
+}
 }
 ?>
