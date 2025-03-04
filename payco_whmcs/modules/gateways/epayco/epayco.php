@@ -77,7 +77,6 @@ class EpaycoConfig
         $nombre = $this->nombreModulo;
         $idioma = $this->checkIdioma();
         $usersWithApiAccess = $this->epayco_getAdminUserWithApiAccess();
-
         $usersWithApiAccessArray = array();
         foreach($usersWithApiAccess as $userWithApiAccess){
             $usersWithApiAccessArray[$userWithApiAccess->username] = $userWithApiAccess->username;
@@ -183,6 +182,7 @@ class EpaycoConfig
                 )
             );
         return $configHeader;
+
     }
     
     function getLinkPago($params)
