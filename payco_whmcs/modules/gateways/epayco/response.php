@@ -78,7 +78,7 @@ echo sprintf('
     <div class="row">
       <div class="container">
         <div class="col-lg-8 col-lg-offset-2">
-       <img src="./logo.png" alt="medios de pago" style="margin-left:-14px; margin-top:-20px; width:850px">
+       <img src="./epayco.png" alt="medios de pago" style="margin-left:-14px; margin-top:-20px; width:850px">
         </div>
       </div>
     </div>
