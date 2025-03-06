@@ -101,7 +101,7 @@ echo sprintf('
       var inicio_ = document.getElementById("inicio");
       inicio_.href = inicio;
       var ref_payco = getQueryParam("ref_payco");
-      var urlapp = "https://secure.epayco.io/validation/v1/reference/" + ref_payco;
+      var urlapp = "https://secure.epayco.co/validation/v1/reference/" + ref_payco;
 
       $.get(urlapp, function(response) {
         if (response.success) {
