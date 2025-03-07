@@ -1,333 +1,53 @@
 <?php
-require_once __DIR__ . '/../../../init.php';
-require_once __DIR__ . '/../../../includes/gatewayfunctions.php';
-require_once __DIR__ . '/../../../includes/invoicefunctions.php';
+include "../../../init.php";
+include ROOTDIR . "/includes/functions.php";
+include ROOTDIR . "/includes/gatewayfunctions.php";
+include ROOTDIR . "/includes/invoicefunctions.php";
 use Illuminate\Database\Capsule\Manager as Capsule;
+require_once(ROOTDIR . "/modules/gateways/epayco/epayco.php");
+$gatewayModule = "epayco";
+$gateway = new WHMCS\Module\Gateway();
 
+if (!$gateway->isActiveGateway($gatewayModule) || !$gateway->load($gatewayModule)) {
+    WHMCS\Terminus::getInstance()->doDie("Module not Active");
+}
+$GATEWAY = $gateway->getParams();
 $gatewayParams = getGatewayVariables('epayco');
 
 if (!$gatewayParams['type']) {
     die("Module Not Activated");
 }
-
-$confirmation = false;
-$async = true;
+if($_GET['ref_payco'] === 'undefined'){
+    $returnUrl = $gatewayParams['systemurl'];
+    header("Location: ".$returnUrl);
+    die();
+}
+$obj = new EpaycoConfig("Epayco",$gatewayModule);
 if(!empty($_GET['ref_payco'])){
     $responseData = @file_get_contents('https://secure.epayco.co/validation/v1/reference/'.$_GET['ref_payco']);
     if($responseData === false){
         logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
         header("Location: ".$gatewayParams['systemurl']);
     }
-    $jsonData = @json_decode($responseData, true);
-
     if($jsonData["status"] === false){
-        logTransaction($gatewayParams['name'], $_GET, 'El formato de la respuesta de validación no es correcto');
+        logTransaction($gatewayParams['name'], $_GET, 'El formato de la respuesta de validaci贸n no es correcto');
         header("Location: ".$gatewayParams['systemurl']);
     }
+    $jsonData = @json_decode($responseData, true);
     $validationData = $jsonData['data'];
-    $async = false;
+    $obj->crearTablaCustomTransacciones();
+    $respuesta = $obj->epaycoConfirmation($GATEWAY, $validationData);
+    $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/response.php';
+    header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
 }else {
-    $validationData = $_GET;
-}
-
-if (!empty(trim($_POST['x_ref_payco']))) {
-    $validationData = $_POST;
-    $async = false;
-    $confirmation= true;
-}
-
-$invoiceid = checkCbInvoiceID($validationData['x_extra1'],$gatewayParams['name']);
-
-$invoice = localAPI("getinvoice", array('invoiceid' => $validationData['x_extra1']), $gatewayParams['WHMCSAdminUser']);
-
-if($invoice['status'] == 'error'){
-    logTransaction($gatewayParams['name'], $validationData, $invoice['message']);
-    if($async){
-        exit(0);
-    }else {
-        if(!$confirmation){
-            header("Location: ".$gatewayParams['systemurl'].'/viewinvoice.php?id='.$validationData['x_extra1'].'&paymentfailed=true');
-        }
+    if (!empty(trim($_REQUEST['x_ref_payco']))) {
+        $validationData = $_REQUEST;
+        $obj->crearTablaCustomTransacciones();
+        $respuesta = $obj->epaycoConfirmation($GATEWAY,$validationData,true);
+        
+        header("HTTP/1.1 " . $respuesta);
+        exit("Callback completo: " . var_export($respuesta,1));
     }
 }
 
-if($invoice['status'] != 'Unpaid'){
-    if($async){
-        exit(0);
-    }else {
-        if(!$confirmation){
-            header("Location: ".$gatewayParams['systemurl']);
-        }
-    }
-}
 
-$invoiceData = Capsule::table('tblorders')
-    ->select('tblorders.amount')
-    ->where('tblorders.invoiceid', '=', $validationData['x_extra1'])
-    ->get();
-$invoiceAmount = $invoiceData[0]->amount;
-$x_test_request= $validationData['x_test_request'];
-$isTestTransaction = $x_test_request == 'TRUE' ? "yes" : "no";
-$isTestMode = $isTestTransaction == "yes" ? "true" : "false";
-$isTestPluginMode = $gatewayParams["testMode"] == "on" ? "yes": "no";
-$x_amount= $validationData['x_amount'];
-if(floatval($invoiceAmount) === floatval($x_amount)){
-    if("yes" == $isTestPluginMode){
-        $validation = true;
-    }
-    if("no" == $isTestPluginMode ){
-        if($x_approval_code != "000000" && $x_cod_transaction_state == 1){
-            $validation = true;
-        }else{
-            if($x_cod_transaction_state != 1){
-                $validation = true;
-            }else{
-                $validation = false;
-            }
-        }
-
-    }
-}else{
-    $validation = false;
-}
-
-$data = Capsule::table('tbladmins')
-    ->join('tbladminroles', 'tbladmins.roleid', '=', 'tbladmins.roleid')
-    ->join('tbladminperms', 'tbladminroles.id', '=', 'tbladminperms.roleid')
-    ->select('tbladmins.username')
-    ->where('tbladmins.disabled', '=', 0)
-    ->where('tbladminperms.permid', '=', 81)
-    ->get();
-$command = 'CancelOrder';
-$postData = array(
-    'orderid' => $validationData['x_extra2'],
-);
-$postDataInvoice = array(
-    'invoiceid' => $validationData['x_extra2'],
-);
-$adminUsername = $data[0]->username;
-
-$signature = hash('sha256',
-    $gatewayParams['customerID'].'^'
-    .$gatewayParams['p_key'].'^'
-    .$validationData['x_ref_payco'].'^'
-    .$validationData['x_transaction_id'].'^'
-    .$validationData['x_amount'].'^'
-    .$validationData['x_currency_code']
-);
-
-if($signature == $validationData['x_signature'] && $validation){
-    switch ((int)$validationData['x_cod_response']) {
-        case 1:{
-            if($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled'){
-                addInvoicePayment(
-                    $invoice['invoiceid'],
-                    $validationData['x_ref_payco'],
-                    $invoice['total'],
-                    null,
-                    $gatewayParams['paymentmethod']
-                );
-                logTransaction($gatewayParams['name'], $validationData, "Aceptada");
-                $results = localAPI('AcceptOrder', $postData, $adminUsername);
-            }else{
-                if($invoice['status'] == 'Cancelled'){
-                    
-                $productsOrder = Capsule::table('tblinvoiceitems')
-                    ->select('tblinvoiceitems.description')
-                    ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
-                    ->where('tblinvoiceitems.type', '=', 'Hosting')
-                    ->get();
-                foreach ($productsOrder as $productOrder )
-                {
-                    $explodProduct = explode(' - ', $productOrder->description, 2);
-                    $productInfo[] = $explodProduct[0]; 
-                }
-                
-                $products = Capsule::table('tblproducts')
-                    ->whereIn('name', $productInfo)
-                    ->get(['name', 'qty'])
-                    ->all();
-                
-                for($i=0; $i<count($products); $i++ ){
-                    $productData[$i]["name"] = $products[$i]->name;
-                    $productData[$i]["qty"] =  $products[$i]->qty-1;
-                } 
-                 
-                for($j=0; $j<count($productData); $j++ ){
-                   $connection = Capsule::table('tblproducts')
-                    ->where('name',"=", $productData[$j]["name"])
-                    ->update(['qty'=> $productData[$j]["qty"]]); 
-                } 
-
-                $results = localAPI('PendingOrder', $postData, $adminUsername);
-                    addInvoicePayment(
-                    $invoice['invoiceid'],
-                    $validationData['x_ref_payco'],
-                    $invoice['total'],
-                    null,
-                    $gatewayParams['paymentmethod']
-                );
-                 logTransaction($gatewayParams['name'], $validationData, "Aceptada");
-                $results = localAPI('AcceptOrder', $postData, $adminUsername);
-                
-                $results = localAPI(
-                        'AddInvoicePayment', array(
-                        'orderid' => $validationData['x_extra2']+1,
-                        'transid' => $validationData['x_ref_payco'],
-                        'gateway' =>  $gatewayParams['paymentmethod']
-                    ), $adminUsername);
-                logTransaction($gatewayParams['name'], $validationData, "Aceptada");
-                $results = localAPI('AcceptOrder',  array(
-                        'orderid' => $validationData['x_extra2']+1,
-                    ), $adminUsername);
-                }
-            }
-            if(!$async){
-                $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                if(!$confirmation){
-                    header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                }
-            }
-            echo "1: ";
-        }break;
-        case 2:{
-            logTransaction($gatewayParams['name'], $validationData, "Cancelled");
-            if($invoice['status'] != 'Cancelled'){
-                $results = localAPI($command, $postData, $adminUsername);
-            }
-            if(!$async){
-                if($confirmation){
-                    echo "2: ";
-                }else{
-                    $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                    if(!$confirmation){
-                        header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                    }
-                }
-            }
-        }break;
-        case 3:{
-            if($invoice['status'] == 'Cancelled'){
-                $productsOrder = Capsule::table('tblinvoiceitems')
-                    ->select('tblinvoiceitems.description')
-                    ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
-                    ->where('tblinvoiceitems.type', '=', 'Hosting')
-                    ->get();
-                foreach ($productsOrder as $productOrder )
-                {
-                    $explodProduct = explode(' - ', $productOrder->description, 2);
-                    $productInfo[] = $explodProduct[0]; 
-                }
-                
-                $products = Capsule::table('tblproducts')
-                    ->whereIn('name', $productInfo)
-                    ->get(['name', 'qty'])
-                    ->all();
-                
-                for($i=0; $i<count($products); $i++ ){
-                    $productData[$i]["name"] = $products[$i]->name;
-                    $productData[$i]["qty"] =  $products[$i]->qty-1;
-                } 
-                
-                for($j=0; $j<count($productData); $j++ ){
-                   Capsule::table('tblproducts')
-                    ->where('name',"=", $productData[$j]["name"])
-                    ->update(['qty'=> $productData[$j]["qty"]]);
-                } 
-            }
-            $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-            if(!$confirmation){
-                header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-            }else{
-                $results = localAPI('PendingOrder', $postData, $adminUsername);
-            }
-            echo "3: ";
-        }break;
-        case 4:{
-            logTransaction($gatewayParams['name'], $validationData, "Failure");
-            if($invoice['status'] != 'Cancelled'){
-                $results = localAPI($command, $postData, $adminUsername);
-            }
-            if(!$async){
-                if($confirmation){
-                    echo "Fallida: ";
-                }else{
-                    $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                    if(!$confirmation){
-                        header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                    }
-                }
-            }
-        }break;
-        case 6:{
-            logTransaction($gatewayParams['name'], $validationData, "Failure");
-            if($invoice['status'] != 'Cancelled'){
-                $results = localAPI($command, $postData, $adminUsername);
-            }
-            if(!$async){
-                if($confirmation){
-                    echo "Fallida: ";
-                }else{
-                    $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                    if(!$confirmation){
-                        header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                    }
-                }
-            }
-        }break;
-        case 10:{
-            logTransaction($gatewayParams['name'], $validationData, "Failure");
-            if($invoice['status'] != 'Cancelled'){
-                $results = localAPI($command, $postData, $adminUsername);
-            }
-            if(!$async){
-                if($confirmation){
-                    echo "10: ";
-                }else{
-                    $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                    if(!$confirmation){
-                        header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                    }
-                }
-            }
-        }break;
-        case 11:{
-            logTransaction($gatewayParams['name'], $validationData, "Failure");
-            if($invoice['status'] != 'Cancelled'){
-                $results = localAPI($command, $postData, $adminUsername);
-            }
-            if(!$async){
-                if($confirmation){
-                    echo "11: ";
-                }else{
-                    $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/epayco.php';
-                    if(!$confirmation){
-                        header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
-                    }
-                }
-            }
-        }break;
-    }
-}else{
-    logTransaction($gatewayParams['name'], $validationData, 'Firma no valida');
-
-    if($invoice['status'] != 'Cancelled'){
-        $results_ = localAPI('PendingOrder', $postData, $adminUsername);
-        if($results_["result"] != "error"){
-            $results = localAPI($command, $postData, $adminUsername);
-        }
-    }
-    if(!$async){
-        if($confirmation){
-            echo "Firma no valida. ";
-        }else{
-            header("Location: ".$gatewayParams['systemurl']);
-        }
-    }
-}
-
-if($results["result"] == "error"){
-    echo $results["result"].": ".$results["message"];
-}else{
-    echo $results["result"];
-}
