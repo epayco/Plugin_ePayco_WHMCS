@@ -56,9 +56,9 @@ class EpaycoConfig
     function getPreferenciaPago($accesstoken, $datos_mp, $prueba = false)
     {
         $userid = substr(strrchr($accesstoken, "-"), 1);
-        $uri = "https://api.mercadopago.com/checkout/preferences/";
+        $uri = "https://api.epayco.com/checkout/preferences/";
         $data = array("additional_info" => "", "auto_return" => $datos_mp["retorno"], "back_urls" => array("failure" => $datos_mp["url_fallo"], "pending" => $datos_mp["url_pendiente"], "success" => $datos_mp["url_exito"]), "binary_mode" => true, "merchant_account_id" => $datos_mp["merchant_account_id"], "processing_modes" => array($datos_mp["processing"]), "processing_mode" => $datos_mp["processing"], "external_reference" => $datos_mp["referencia"], "items" => array(array("id" => "", "currency_id" => $datos_mp["item_moneda"], "title" => $datos_mp["item_titulo"], "picture_url" => $datos_mp["item_imagen"], "description" => $datos_mp["item_descripcion"], "category_id" => "services", "quantity" => 1, "unit_price" => $datos_mp["item_precio"])), "notification_url" => $datos_mp["notification_url"], "payer" => array("phone" => array("area_code" => $datos_mp["comprador_telefono_codigodearea"], "number" => $datos_mp["comprador_telefono_numero"]), "address" => array("zip_code" => $datos_mp["comprador_domicilio_codigopostal"], "street_name" => $datos_mp["comprador_domicilio_calle"], "street_number" => $datos_mp["comprador_domicilio_numero"]), "identification" => array("number" => $datos_mp["comprador_documento_numero"], "type" => $datos_mp["comprador_documento_tipo"]), "email" => $datos_mp["comprador_email"], "name" => $datos_mp["comprador_nombre"], "surname" => $datos_mp["comprador_apellido"]), "payment_methods" => array("excluded_payment_types" => $datos_mp["exclusiones"]));
-        $url = "https://api.mercadopago.com/checkout/preferences/?access_token=" . $accesstoken;
+        $url = "https://api.epayco.com/checkout/preferences/?access_token=" . $accesstoken;
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/4.0");
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
