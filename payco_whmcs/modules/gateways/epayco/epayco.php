@@ -174,12 +174,13 @@ class EpaycoConfig
                         "dark" => traduccionEpayco($idioma, "epconfig_32"), 
                         "link" => traduccionEpayco($idioma, "epconfig_33")
                     ), "Description" => traduccionEpayco($idioma, "epconfig_34")
-                ),*/
+                ),
                 "bh_modocolaprocesamiento" => array(
                     "FriendlyName" => traduccionEpayco($idioma, "epconfig_35") . ":", 
                     "Type" => "yesno", 
                     "Description" => traduccionEpayco($idioma, "epconfig_36")
                 )
+                */
             );
         return $configHeader;
 
@@ -273,7 +274,7 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod.js">
+                src="https://epayco-checkout-testing.s3.us-east-1.amazonaws.com/checkout.preprod_v1.js">
             </script>
             <script>
                 var handler = ePayco.checkout.configure({
@@ -304,6 +305,7 @@ class EpaycoConfig
                     autoclick: "true",
                     extras_epayco:{extra5:"P34"},
                     method_confirmation: "POST"
+                    checkout_version:"1"
                 }
                 const apiKey = "%s";
                 const privateKey = "%s";
@@ -326,7 +328,7 @@ class EpaycoConfig
                     headers["privatekey"] = privatekey;
                     headers["apikey"] = apikey;
                     var payment =   function (){
-                        return  fetch("https://cms.epayco.io/checkout/payment/session", {
+                        return  fetch("https://eks-cms-backend-platforms-service.epayco.io/checkout/payment/session", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
@@ -418,7 +420,7 @@ class EpaycoConfig
         //$informes = json_decode(file_get_contents("php://input"), true);
         $informe_cobro = $informe['x_extra1'];
         $email = $gatewayOBJ["email"];
-        $modoProcesamientoPorColas = $gatewayOBJ["bh_modocolaprocesamiento"] == "on";
+        //$modoProcesamientoPorColas = $gatewayOBJ["bh_modocolaprocesamiento"] == "on";
         $admin = $gatewayOBJ["useradmin"];
         if (!empty($admin)) {
             $adminUsername = $gatewayOBJ["useradmin"];
@@ -449,7 +451,7 @@ class EpaycoConfig
     function getPaymentEpayco($gateway, $transaccion)
     {        
        $publicKey = $gateway['publicKey'];
-       $url = "https://apify.epayco.co/login";
+       $url = "https://eks-apify-service.epayco.io/login";
        $data = array(
             'public_key' => $gateway['publicKey'],
             'private_key' => $gateway['privateKey']
@@ -476,7 +478,7 @@ class EpaycoConfig
         }
           
         $publicKey = $gateway['publicKey'];
-        $url = "https://secure.epayco.io/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
+        $url = "https://eks-rest-pagos-service.epayco.io/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
         return $this->makeRequest($gateway,[], $url, $bearer_token);
         
     }
