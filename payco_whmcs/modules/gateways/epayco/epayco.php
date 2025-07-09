@@ -586,7 +586,7 @@ class EpaycoConfig
                 }else{
                     $validation = false;
                 }
-                if($signature == $validationData['x_signature'] && $validation){
+                if(($signature == $validationData['x_signature'] || $validationData['x_signature'] == 'Authorized')  && $validation){
                 switch ((int)$validationData['x_cod_response']) {
                     case 1:{
                         if($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled'){

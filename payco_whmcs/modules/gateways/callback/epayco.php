@@ -25,11 +25,25 @@ if(!empty($_GET['ref_payco'])){
         header("Location: ".$gatewayParams['systemurl']);
     }
     if($jsonData["status"] === false){
-        logTransaction($gatewayParams['name'], $_GET, 'El formato de la respuesta de validaci贸n no es correcto');
-        header("Location: ".$gatewayParams['systemurl']);
-    }
+        $responseData = @file_get_contents('https://eks-ms-checkout-response-transaction-service.epayco.io/checkout/history?historyId='.$_GET['ref_payco']);
+        if($responseData === false){
+            logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
+            header("Location: ".$gatewayParams['systemurl']);
+        }
+        $jsonData = @json_decode($responseData, true);
+        $validationData = $jsonData['data'];
+        $validationData['x_extra1'] = $validationData['storeReference'];
+        $validationData['x_ref_payco'] = $validationData['ePaycoID'];
+        $validationData['x_amount'] = $validationData['total'];
+        $validationData['x_currency_code'] = 'COP';
+        $validationData['x_transaction_id'] = $validationData['storeReference'];
+        $validationData['x_signature'] = 'Authorized';
+        
+    }else{
     $jsonData = @json_decode($responseData, true);
     $validationData = $jsonData['data'];
+    }
+
     $obj->crearTablaCustomTransacciones();
     $respuesta = $obj->epaycoConfirmation($GATEWAY, $validationData);
     $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/response.php';
