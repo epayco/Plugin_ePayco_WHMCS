@@ -254,7 +254,7 @@ class EpaycoConfig
             $sub_total = $params["amount"];
             $amount = $params["amount"];
         }
-    
+        $sub_total = $amount - $tax;
         $confirmationUrl = $systemurl . "modules/gateways/callback/" . $params["paymentmethod"] . ".php?source_news=webhooks";
         $lang = $params['lang'];
         if ($lang === "en") {
