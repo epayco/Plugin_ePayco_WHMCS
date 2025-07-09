@@ -24,7 +24,7 @@ if(!empty($_GET['ref_payco'])){
         logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
         header("Location: ".$gatewayParams['systemurl']);
     }
-    if($jsonData["status"] === false){
+    if(isset($jsonData['status']) && !$jsonData['status']){
         $responseData = @file_get_contents('https://eks-ms-checkout-response-transaction-service.epayco.io/checkout/history?historyId='.$_GET['ref_payco']);
         if($responseData === false){
             logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
