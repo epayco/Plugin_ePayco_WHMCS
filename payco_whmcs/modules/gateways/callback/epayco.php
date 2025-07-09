@@ -38,6 +38,19 @@ if(!empty($_GET['ref_payco'])){
         $validationData['x_currency_code'] = 'COP';
         $validationData['x_transaction_id'] = $validationData['storeReference'];
         $validationData['x_signature'] = 'Authorized';
+        switch ($transactionHistory['status']) {
+            case "Aprobada":
+                $x_cod_transaction_state = 1;
+                break;
+            case "Pendiente":
+            case "iniciada":
+                $x_cod_transaction_state = 3;
+            break;
+            default:
+                $x_cod_transaction_state = 2;
+                break;
+        }
+        $validationData['x_cod_response'] = $x_cod_transaction_state;
         
     }else{
     $jsonData = @json_decode($responseData, true);
