@@ -274,7 +274,7 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://epayco-checkout-testing.s3.us-east-1.amazonaws.com/checkout.preprod_v1.js">
+                src="https://checkout.epayco.co/checkout.js">
             </script>
             <script>
                 var handler = ePayco.checkout.configure({
@@ -328,7 +328,7 @@ class EpaycoConfig
                     headers["privatekey"] = privatekey;
                     headers["apikey"] = apikey;
                     var payment =   function (){
-                        return  fetch("https://eks-cms-backend-platforms-service.epayco.io/checkout/payment/session", {
+                        return  fetch("https://cms.epayco.co/checkout/payment/session", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
@@ -451,7 +451,7 @@ class EpaycoConfig
     function getPaymentEpayco($gateway, $transaccion)
     {        
        $publicKey = $gateway['publicKey'];
-       $url = "https://eks-apify-service.epayco.io/login";
+       $url = "https://apify.epayco.co/login";
        $data = array(
             'public_key' => $gateway['publicKey'],
             'private_key' => $gateway['privateKey']
@@ -478,7 +478,7 @@ class EpaycoConfig
         }
           
         $publicKey = $gateway['publicKey'];
-        $url = "https://eks-rest-pagos-service.epayco.io/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
+        $url = "https://secure.payco.co/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
         return $this->makeRequest($gateway,[], $url, $bearer_token);
         
     }

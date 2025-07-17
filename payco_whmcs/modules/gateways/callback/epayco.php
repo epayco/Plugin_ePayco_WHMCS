@@ -19,7 +19,7 @@ if (!$gatewayParams['type']) {
 }
 $obj = new EpaycoConfig("Epayco",$gatewayModule);
 if(!empty($_GET['ref_payco'])){
-    $responseData = @file_get_contents('https://eks-checkout-service.epayco.io/validation/v1/reference/'.$_GET['ref_payco']);
+    $responseData = @file_get_contents('https://secure.epayco.co/validation/v1/reference/'.$_GET['ref_payco']);
     if($responseData === false){
         logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
         header("Location: ".$gatewayParams['systemurl']);

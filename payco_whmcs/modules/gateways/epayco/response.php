@@ -101,7 +101,7 @@ echo sprintf('
       var inicio_ = document.getElementById("inicio");
       inicio_.href = inicio;
       var ref_payco = getQueryParam("ref_payco");
-      var urlapp = "https://eks-checkout-service.epayco.io/validation/v1/reference/" + ref_payco;
+      var urlapp = "https://secure.epayco.co/validation/v1/reference/" + ref_payco;
       var secodnUrl = "https://eks-ms-checkout-response-transaction-service.epayco.io/checkout/history?historyId=" + ref_payco;
 
       $.get(urlapp, function(response) {
