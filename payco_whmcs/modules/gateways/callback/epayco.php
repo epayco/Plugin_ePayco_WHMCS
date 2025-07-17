@@ -17,6 +17,11 @@ $gatewayParams = getGatewayVariables('epayco');
 if (!$gatewayParams['type']) {
     die("Module Not Activated");
 }
+if($_GET['ref_payco'] === 'undefined'){
+    $returnUrl = $gatewayParams['systemurl'];
+    header("Location: ".$returnUrl);
+    die();
+}
 $obj = new EpaycoConfig("Epayco",$gatewayModule);
 if(!empty($_GET['ref_payco'])){
     $responseData = @file_get_contents('https://secure.epayco.co/validation/v1/reference/'.$_GET['ref_payco']);

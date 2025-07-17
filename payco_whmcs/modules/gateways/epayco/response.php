@@ -77,7 +77,7 @@ echo sprintf('
   <footer>
     <div class="row">
       <div class="container">
-        <div class="col-lg-8 col-lg-offset-2">
+        <div class="col-lg-8 col-lg-offset-2" style="margin-top: 50px;">
        <img src="./epayco.png" alt="medios de pago" style="margin-left:-14px; margin-top:-20px; width:850px">
         </div>
       </div>
@@ -104,6 +104,7 @@ echo sprintf('
       var urlapp = "https://secure.epayco.co/validation/v1/reference/" + ref_payco;
       var secodnUrl = "https://eks-ms-checkout-response-transaction-service.epayco.io/checkout/history?historyId=" + ref_payco;
 
+
       $.get(urlapp, function(response) {
         if (response.success) {
           if (response.data.x_cod_response == 1) {
@@ -126,7 +127,7 @@ echo sprintf('
 
           $("#fecha").html(response.data.x_transaction_date);
           $("#respuesta").html(response.data.x_response);
-          $("#referencia").text(response.data.x_id_invoice);
+          $("#referencia").text(response.data.x_ref_payco);
           $("#motivo").text(response.data.x_response_reason_text);
           $("#recibo").text(response.data.x_transaction_id);
           $("#banco").text(response.data.x_bank_name);
