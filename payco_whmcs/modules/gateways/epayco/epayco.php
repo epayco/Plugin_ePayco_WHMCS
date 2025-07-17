@@ -304,7 +304,7 @@ class EpaycoConfig
                     taxIco: "0".toString(),
                     autoclick: "true",
                     extras_epayco:{extra5:"P34"},
-                    method_confirmation: "POST"
+                    method_confirmation: "POST",
                     checkout_version:"1"
                 }
                 const apiKey = "%s";
