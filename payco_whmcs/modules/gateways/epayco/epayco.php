@@ -187,236 +187,227 @@ class EpaycoConfig
     }
     
     function getLinkPago($params)
-    {
-        $companyname = $params["companyname"];
-        $systemurl = $params["systemurl"];
-        $bh_texto = $params["bh_texto"];
-        $bh_nota = $params["bh_nota"];
-        $color = $params["color"];
-        $nota = "";
-        if (!empty($bh_nota)) {
-            $nota = "<p><div class='small-text'>" . $bh_nota . "</div></p>";
-        }
+{
+    $companyname = $params["companyname"];
+    $systemurl   = $params["systemurl"];
+    $bh_texto    = $params["bh_texto"];
+    $bh_nota     = $params["bh_nota"];
+    $color       = $params["color"];
 
-        if ($params["testMode"] == "on") {
-            $mododeprueba = true;
-        } else {
-            $mododeprueba = false;
-        }
-      
+    $nota = "";
+    if (!empty($bh_nota)) {
+        $nota = "<p><div class='small-text'>" . $bh_nota . "</div></p>";
+    }
 
-        $bh_success = $params["bh_success"];
-        $bh_pending = $params["bh_pending"];
-        $bh_failure = $params["bh_failure"];
-        $bh_error_mp = $params["bh_error_mp"];
-        if (empty($bh_success)) {
-            $bh_success = $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
-        }
-        if (empty($bh_pending)) {
-            $bh_pending = $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
-        }
-        if (empty($bh_failure)) {
-            $bh_failure = $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
-        }
+    $bh_success   = $params["bh_success"] ?: $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
+    $bh_pending   = $params["bh_pending"] ?: $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
+    $bh_failure   = $params["bh_failure"] ?: $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
+    $bh_error_mp  = $params["bh_error_mp"];
 
-        
-        $countryCode = 'CO';
-        $firstname = $params['clientdetails']['firstname'];
-        $lastname = $params['clientdetails']['lastname'];
-        $email = $params['clientdetails']['email'];
-        $address1 = $params['clientdetails']['address1'];
-        $returnUrl = $params['returnurl'];
-        $billing_name = $firstname." ".$lastname;
-        if($params['currencyCode'] == 'default'){
-            $clientDetails = localAPI("getclientsdetails", ["clientid" => $params['clientdetails']['userid'], "responsetype" => "json"], $params['WHMCSAdminUser']);
-            $currencyCode = strtolower($clientDetails['currency_code']);
-        }else {
-            $currencyCode = $params['currencyCode'];
-        }
-    
-        $testMode = $params['testMode'] == 'on' ? 'true' : 'false';
-    
-        $externalMode = $params['externalMode'] == 'on' ? 'true' : 'false';
-    
-        $invoice = localAPI("getinvoice", array('invoiceid' => $params['invoiceid']), $params['WHMCSAdminUser']);
-        $invoiceData = Capsule::table('tblorders')
-            ->select('tblorders.id')
-            ->where('tblorders.invoiceid', '=', $params['invoiceid'])
-            ->get();
-    
-        $description = $this->epayco_getChargeDescription($invoice['items']['item']);
-        if(floatval($invoice["subtotal"]) > 0.0 ){
-            $tax=floatval($invoice["tax"]);
-            $sub_total = floatval($invoice["subtotal"]);
-            $amount = floatval($invoice["total"]);
-        }else{
-            $tax="0";
-            $sub_total = $params["amount"];
-            $amount = $params["amount"];
-        }
-        $sub_total = $amount - $tax;
-        $confirmationUrl = $systemurl . "modules/gateways/callback/" . $params["paymentmethod"] . ".php?source_news=webhooks";
-        $lang = $params['lang'];
-        if ($lang === "en") {
-            $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color-Ingles.png';
-        }else{
-            $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color1.png';
-        }
-        $ip=$this->getCustomerIp(); 
-        $logo = $params['systemurl'].'/modules/gateways/epayco/logo.png';
-        $code = "<img src=" . $logo . " /><br><a href='" . $enlace . "' class='btn btn-" . $color . "'>" . $bh_texto . "</a>" . $nota;
-        $code = sprintf('
-            <style>
-                .disabled {
-                    pointer-events: none;
-                    opacity: 0.5; 
-                    text-decoration: none; 
-                    cursor: not-allowed;
-                }
-            </style>
-            <p>       
-                <center>
+    $countryCode  = 'CO';
+    $firstname    = $params['clientdetails']['firstname'];
+    $lastname     = $params['clientdetails']['lastname'];
+    $email        = $params['clientdetails']['email'];
+    $address1     = $params['clientdetails']['address1'];
+    $billing_name = $firstname . " " . $lastname;
+
+    if ($params['currencyCode'] == 'default') {
+        $clientDetails = localAPI("getclientsdetails", ["clientid" => $params['clientdetails']['userid'], "responsetype" => "json"], $params['WHMCSAdminUser']);
+        $currencyCode = strtolower($clientDetails['currency_code']);
+    } else {
+        $currencyCode = $params['currencyCode'];
+    }
+
+    // Mantengo el tipo string "true"/"false" porque el resto del código lo usa así
+    $testMode     = $params['testMode']    == 'on' ? 'true' : 'false';
+    $externalMode = $params['externalMode'] == 'on' ? 'true' : 'false';
+
+    $invoice = localAPI("getinvoice", ['invoiceid' => $params['invoiceid']], $params['WHMCSAdminUser']);
+    $invoiceData = Capsule::table('tblorders')
+        ->select('tblorders.id')
+        ->where('tblorders.invoiceid', '=', $params['invoiceid'])
+        ->get();
+
+    $description = $this->epayco_getChargeDescription($invoice['items']['item']);
+
+    if (floatval($invoice["subtotal"]) > 0.0) {
+        $tax       = floatval($invoice["tax"]);
+        $sub_total = floatval($invoice["subtotal"]);
+        $amount    = floatval($invoice["total"]);
+    } else {
+        $tax       = "0";
+        $sub_total = $params["amount"];
+        $amount    = $params["amount"];
+    }
+    $sub_total = $amount - $tax;
+
+    $confirmationUrl = $systemurl . "modules/gateways/callback/" . $params["paymentmethod"] . ".php?source_news=webhooks";
+    $lang = $params['lang'];
+
+    if ($lang === "en") {
+        $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color-Ingles.png';
+    } else {
+        $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color1.png';
+    }
+
+    $ip   = $this->getCustomerIp();
+    $logo = $params['systemurl'] . '/modules/gateways/epayco/logo.png';
+
+    // Sanitiza y limita name/description (opcional pero recomendable)
+    // Sustituye saltos de línea por " / " para que sea legible
+    $descClean = preg_replace("/\r\n|\r|\n/u", " / ", (string)$description);
+    // Si quieres límite estricto (ej. API o UI): 254 caracteres
+    $descClean = mb_substr($descClean, 0, 254, 'UTF-8');
+
+    // Construye el payload que irá a JS como JSON literal
+    $payload = [
+        'amount'              => (string)$amount,
+        'tax_base'            => (string)$sub_total,
+        'tax'                 => (string)$tax,
+        'name'                => $descClean,
+        'description'         => $descClean,
+        'currency'            => strtolower($currencyCode),
+        'test'                => (string)$testMode,
+        'invoice'             => (string)$params['invoiceid'],
+        'country'             => $countryCode,
+        'response'            => $confirmationUrl,
+        'confirmation'        => $confirmationUrl,
+        'external'            => (string)$externalMode,
+        'email_billing'       => $email,
+        'name_billing'        => $billing_name,
+        'address_billing'     => $address1,
+        'extra1'              => (string)$params['invoiceid'],
+        'extra2'              => isset($invoiceData[0]) ? (string)$invoiceData[0]->id : "",
+        'lang'                => $lang,
+        'ip'                  => $ip,
+        'taxIco'              => "0",
+        'autoclick'           => "true",
+        'extras_epayco'       => ['extra5' => 'P34'],
+        'method_confirmation' => "POST",
+        'checkout_version'    => "1",
+    ];
+
+    // JSON sin escapar Unicode ni slashes, para que quede limpio y válido en JS
+    $dataJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $code = sprintf('
+        <style>
+            .disabled {
+                pointer-events: none;
+                opacity: 0.5;
+                text-decoration: none;
+                cursor: not-allowed;
+            }
+        </style>
+        <p>
+            <center>
+                <img src="%s" alt="ePayco" style="display:none" /> 
                 <a id="btn_epayco" href="#">
-                    <img src="'.$epaycoButtonImage.'">
+                    <img src="%s">
                 </a>
-                </center> 
-            </p>
-            <script
-                src="https://checkout.epayco.co/checkout.js">
-            </script>
-            <script>
-                var handler = ePayco.checkout.configure({
-                        key: "%s",
-                        test: "%s"
-                    })
-                var data = {
-                    amount: "%s".toString(),
-                    tax_base: "%s".toString(),
-                    tax: "%s".toString(),
-                    name: "%s",
-                    description: "%s",
-                    currency: "%s",
-                    test: "%s".toString(),
-                    invoice: "%s",
-                    country: "%s",
-                    response: "%s",
-                    confirmation: "%s",
-                    external: "%s",
-                    email_billing: "%s",
-                    name_billing: "%s",
-                    address_billing: "%s",
-                    extra1: "%s",
-                    extra2: "%s",
-                    lang: "%s",
-                    ip: "%s",
-                    taxIco: "0".toString(),
-                    autoclick: "true",
-                    extras_epayco:{extra5:"P34"},
-                    method_confirmation: "POST",
-                    checkout_version:"1"
-                }
-                const apiKey = "%s";
-                const privateKey = "%s";
-                const link = document.getElementById("btn_epayco");
-                var openNewChekout = function () {
-                    link.classList.add("disabled");
-                    if(localStorage.getItem("invoicePayment") == null){
+            </center>
+        </p>
+        <script src="https://checkout.epayco.co/checkout.js"></script>
+        <script>
+            var handler = ePayco.checkout.configure({
+                key: "%s",
+                test: "%s"
+            });
+            var data = %s;
+
+            const apiKey = "%s";
+            const privateKey = "%s";
+            const link = document.getElementById("btn_epayco");
+
+            var openNewChekout = function () {
+                link.classList.add("disabled");
+                if (localStorage.getItem("invoicePayment") == null) {
+                    localStorage.setItem("invoicePayment", data.invoice);
+                    makePayment(privateKey, apiKey, data, data.external == "true" ? true : false);
+                } else {
+                    if (localStorage.getItem("invoicePayment") != data.invoice) {
+                        localStorage.removeItem("invoicePayment");
                         localStorage.setItem("invoicePayment", data.invoice);
-                        makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
-                    }else{
-                        if(localStorage.getItem("invoicePayment") != data.invoice){
-                            localStorage.removeItem("invoicePayment");
-                            localStorage.setItem("invoicePayment", data.invoice);
-                            makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
-                        }else{
-                            makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
+                        makePayment(privateKey, apiKey, data, data.external == "true" ? true : false);
+                    } else {
+                        makePayment(privateKey, apiKey, data, data.external == "true" ? true : false);
+                    }
+                }
+            };
+
+            var makePayment = function (privatekey, apikey, info, external) {
+                const headers = { "Content-Type": "application/json" };
+                headers["privatekey"] = privatekey;
+                headers["apikey"] = apikey;
+
+                var payment = function () {
+                    return fetch("https://cms.epayco.co/checkout/payment/session", {
+                        method: "POST",
+                        body: JSON.stringify(info),
+                        headers
+                    })
+                    .then(res => res.json())
+                    .catch(err => err);
+                };
+
+                payment()
+                    .then(session => {
+                        link.classList.remove("disabled");
+                        if (session && session.data && session.data.sessionId !== undefined) {
+                            localStorage.removeItem("sessionPayment");
+                            localStorage.setItem("sessionPayment", session.data.sessionId);
+                            const handlerNew = window.ePayco.checkout.configure({
+                                sessionId: session.data.sessionId,
+                                external: external,
+                            });
+                            handlerNew.openNew();
+                        } else {
+                            handler.open(data);
                         }
-                    }
-                }
-                var makePayment = function (privatekey, apikey, info, external) {
-                    const headers = { "Content-Type": "application/json" } ;
-                    headers["privatekey"] = privatekey;
-                    headers["apikey"] = apikey;
-                    var payment =   function (){
-                        return  fetch("https://cms.epayco.co/checkout/payment/session", {
-                            method: "POST",
-                            body: JSON.stringify(info),
-                            headers
-                        })
-                            .then(res =>  res.json())
-                            .catch(err => err);
-                    }
-                    payment()
-                        .then(session => {
+                    })
+                    .catch(error => {
                         link.classList.remove("disabled");
-                            if(session.data.sessionId != undefined){
-                                localStorage.removeItem("sessionPayment");
-                                localStorage.setItem("sessionPayment", session.data.sessionId);
-                                const handlerNew = window.ePayco.checkout.configure({
-                                    sessionId: session.data.sessionId,
-                                    external: external,
-                                });
-                                handlerNew.openNew()
-                            }else{
-                                handler.open(data);
-                            }
-                        })
-                        .catch(error => {
-                        link.classList.remove("disabled");
-                            error.message;
-                            console.log(error.message);
-                        });
+                        console.log(error && error.message ? error.message : error);
+                    });
+            };
+
+            var openChekout = function () {
+                openNewChekout();
+            };
+
+            var bntPagar = document.getElementById("btn_epayco");
+            bntPagar.addEventListener("click", openChekout);
+
+            window.onload = function() {
+                document.addEventListener("contextmenu", function(e){
+                    e.preventDefault();
+                }, false);
+            };
+
+            $(document).keydown(function (event) {
+                if (event.keyCode == 123) {
+                    return false;
+                } else if (event.ctrlKey && event.shiftKey && event.keyCode == 73) {
+                    return false;
                 }
-                var openChekout = function () {
-                    //handler.open(data);
-                    openNewChekout()
-                }
-                var bntPagar = document.getElementById("btn_epayco");
-                bntPagar.addEventListener("click", openChekout);
-                //openNewChekout()
-                window.onload = function() {
-                    document.addEventListener("contextmenu", function(e){
-                        e.preventDefault();
-                    }, false);
-                } 
-                $(document).keydown(function (event) {
-                    if (event.keyCode == 123) {
-                        return false;
-                    } else if (event.ctrlKey && event.shiftKey && event.keyCode == 73) {        
-                        return false;
-                    }
-                });
-            </script>
+            });
+        </script>
         </form>
         %s
-    ',  
+    ',
+        htmlspecialchars($logo, ENT_QUOTES, 'UTF-8'),
+        $epaycoButtonImage,
         $params['publicKey'],
         $testMode,
-        $amount,
-        $sub_total,
-        $tax,
-        $description, 
-        $description,
-        strtolower($currencyCode), 
-        $testMode, 
-        $params['invoiceid'], 
-        $countryCode, 
-        $confirmationUrl, 
-        $confirmationUrl, 
-        $externalMode, 
-        $email, 
-        $billing_name, 
-        $address1,
-        $params['invoiceid'],
-        $invoiceData[0]->id,
-        $lang,
-        $ip,
+        $dataJson,
         $params['publicKey'],
         $params['privateKey'],
         $nota
     );
-        return $code;
-    }
+
+    return $code;
+}
+
     function epayco_getChargeDescription($invoceItems){
     $descriptions = array();
     foreach($invoceItems as $item){
