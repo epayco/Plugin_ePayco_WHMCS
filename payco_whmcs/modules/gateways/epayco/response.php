@@ -77,7 +77,7 @@ echo sprintf('
   <footer>
     <div class="row">
       <div class="container">
-        <div class="col-lg-8 col-lg-offset-2">
+        <div class="col-lg-8 col-lg-offset-2" style="margin-top: 50px;">
        <img src="./epayco.png" alt="medios de pago" style="margin-left:-14px; margin-top:-20px; width:850px">
         </div>
       </div>
@@ -102,7 +102,6 @@ echo sprintf('
       inicio_.href = inicio;
       var ref_payco = getQueryParam("ref_payco");
       var urlapp = "https://eks-checkout-service.epayco.io/validation/v1/reference/" + ref_payco;
-      var secodnUrl = "https://eks-ms-checkout-response-transaction-service.epayco.io/checkout/history?historyId=" + ref_payco;
 
       $.get(urlapp, function(response) {
         if (response.success) {
@@ -126,7 +125,7 @@ echo sprintf('
 
           $("#fecha").html(response.data.x_transaction_date);
           $("#respuesta").html(response.data.x_response);
-          $("#referencia").text(response.data.x_id_invoice);
+          $("#referencia").text(response.data.x_ref_payco);
           $("#motivo").text(response.data.x_response_reason_text);
           $("#recibo").text(response.data.x_transaction_id);
           $("#banco").text(response.data.x_bank_name);
@@ -134,20 +133,7 @@ echo sprintf('
           $("#total").text(response.data.x_amount + " " + response.data.x_currency_code);
 
         } else {
-         $.get(secodnUrl, function(response) {
-            if (response.status) {
-              $("#fecha").html(response.date);
-              $("#respuesta").html(response.status);
-              $("#referencia").text(response.ePaycoID);
-              $("#motivo").text(response.status);
-              $("#recibo").text(response.storeReference);
-              $("#banco").text(response.franchise	);
-              $("#autorizacion").text(response.authorization	);
-              $("#total").text(response.total);
-            }else{
-             alert("Error consultando la información");
-            }
-         })
+          alert("Error consultando la información");
         }
       });
 
