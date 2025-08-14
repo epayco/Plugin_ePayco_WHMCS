@@ -101,9 +101,7 @@ echo sprintf('
       var inicio_ = document.getElementById("inicio");
       inicio_.href = inicio;
       var ref_payco = getQueryParam("ref_payco");
-      var urlapp = "https://secure.epayco.co/validation/v1/reference/" + ref_payco;
-      var secodnUrl = "https://eks-ms-checkout-response-transaction-service.epayco.io/checkout/history?historyId=" + ref_payco;
-
+      var urlapp = "https://eks-checkout-service.epayco.io/validation/v1/reference/" + ref_payco;
 
       $.get(urlapp, function(response) {
         if (response.success) {
@@ -135,20 +133,7 @@ echo sprintf('
           $("#total").text(response.data.x_amount + " " + response.data.x_currency_code);
 
         } else {
-         $.get(secodnUrl, function(response) {
-            if (response.status) {
-              $("#fecha").html(response.date);
-              $("#respuesta").html(response.status);
-              $("#referencia").text(response.ePaycoID);
-              $("#motivo").text(response.status);
-              $("#recibo").text(response.storeReference);
-              $("#banco").text(response.franchise	);
-              $("#autorizacion").text(response.authorization	);
-              $("#total").text(response.total);
-            }else{
-             alert("Error consultando la información");
-            }
-         })
+          alert("Error consultando la información");
         }
       });
 
