@@ -219,7 +219,7 @@ class EpaycoConfig
             $bh_failure = $systemurl . "viewinvoice.php?id=" . $params["invoiceid"];
         }
 
-        
+
         $countryCode = 'CO';
         $firstname = $params['clientdetails']['firstname'];
         $lastname = $params['clientdetails']['lastname'];
@@ -233,7 +233,7 @@ class EpaycoConfig
         }else {
             $currencyCode = $params['currencyCode'];
         }
-    
+
         $testMode = $params['testMode'] == 'on' ? 'true' : 'false';
     
         $externalMode = $params['externalMode'] == 'on' ? 'true' : 'false';
@@ -265,15 +265,37 @@ class EpaycoConfig
         $ip=$this->getCustomerIp(); 
         $logo = $params['systemurl'].'/modules/gateways/epayco/logo.png';
         $code = "<img src=" . $logo . " /><br><a href='" . $enlace . "' class='btn btn-" . $color . "'>" . $bh_texto . "</a>" . $nota;
+        $payload = [
+            "amount"=> (string)$amount,
+            "tax_base"=>  (string)$sub_total,
+            "tax"=> (string)$tax,
+            "name"=> substr($description, 0, 50), 
+            "description"=> substr($description, 0, 50), 
+            "currency"=> strtolower($currencyCode), 
+            "test"=> $testMode,
+            "invoice"=> (string)$params['invoiceid'],
+            "country"=> $countryCode,
+            "response"=> $confirmationUrl,
+            "confirmation"=> $confirmationUrl,
+            "external"=> $externalMode,
+            "email_billing"=>$email,
+            "name_billing"=> $billing_name,
+            "address_billing"=> $address1,
+            "extra1"=> (string)$params['invoiceid'],
+            "extra2"=> (string)$invoiceData[0]->id,
+            "lang"=> $lang,
+            "ip"=> (string)$ip,
+            "taxIco"=> "0",
+            "autoclick"=> "true",
+            "extras_epayco"=>["extra5"=>"P34"],
+            "method_confirmation"=> "POST",
+            "checkout_version"=>"2"    
+        ];
+        $payload['extra3'] = base64_encode(json_encode($payload));
+        //$paymentSession = $this->epaycoSessionPayment($params, $payload);
+        $tokenBearer =$this->ePaycoToken($params);
+        $checkout =  base64_encode(json_encode($payload));  
         $code = sprintf('
-            <style>
-                .disabled {
-                    pointer-events: none;
-                    opacity: 0.5; 
-                    text-decoration: none; 
-                    cursor: not-allowed;
-                }
-            </style>
             <p>       
                 <center>
                 <a id="btn_epayco" href="#">
@@ -282,76 +304,96 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://checkout.epayco.co/checkout.js">
+                src="https://epayco-checkout-testing.s3.us-east-1.amazonaws.com/checkout.preprod.js">
             </script>
             <script>
+            const publicKey = "%s";
+            const privateKey = "%s";
                 var handler = ePayco.checkout.configure({
-                        key: "%s",
-                        test: "%s"
-                    })
+                    key: publicKey,
+                    test: "%s"
+                })
+                var bntPagar = document.getElementById("btn_epayco");
+                const params = JSON.parse(atob("%s"));
+                const bearerToken = "%s";
+                let {
+                    amount,
+                    tax_base,
+                    tax,
+                    name,
+                    description,
+                    currency,
+                    test,
+                    invoice,
+                    country,
+                    response,
+                    confirmation,
+                    external,
+                    email_billing,
+                    name_billing,
+                    address_billing,
+                    extra1,
+                    extra2,
+                    extra3,
+                    lang,
+                    ip,
+                    taxIco,
+                    autoclick,
+                    extras_epayco,
+                    method_confirmation,
+                    checkout_version
+                } = params;
                 var data = {
-                    amount: "%s".toString(),
-                    tax_base: "%s".toString(),
-                    tax: "%s".toString(),
-                    name: "%s",
-                    description: "%s",
-                    currency: "%s",
-                    test: "%s".toString(),
-                    invoice: "%s",
-                    country: "%s",
-                    response: "%s",
-                    confirmation: "%s",
-                    external: "%s",
-                    email_billing: "%s",
-                    name_billing: "%s",
-                    address_billing: "%s",
-                    extra1: "%s",
-                    extra2: "%s",
-                    lang: "%s",
-                    ip: "%s",
-                    taxIco: "0".toString(),
-                    autoclick: "true",
-                    extras_epayco:{extra5:"P34"},
-                    method_confirmation: "POST",
-                    checkout_version:"1"
+                    amount,
+                    tax_base,
+                    tax,
+                    name,
+                    description,
+                    currency,
+                    test,
+                    invoice,
+                    country,
+                    response,
+                    confirmation,
+                    external,
+                    email_billing,
+                    name_billing,
+                    address_billing,
+                    extra1,
+                    extra2,
+                    lang,
+                    ip,
+                    taxIco,
+                    autoclick,
+                    extras_epayco,
+                    method_confirmation,
+                    checkout_version
                 }
-                const apiKey = "%s";
-                const privateKey = "%s";
-                const link = document.getElementById("btn_epayco");
                 var openNewChekout = function () {
-                    link.classList.add("disabled");
-                    if(localStorage.getItem("invoicePayment") == null){
-                        localStorage.setItem("invoicePayment", data.invoice);
-                        makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
-                    }else{
-                        if(localStorage.getItem("invoicePayment") != data.invoice){
-                            localStorage.removeItem("invoicePayment");
-                            localStorage.setItem("invoicePayment", data.invoice);
-                            makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
-                        }else{
-                            makePayment(privateKey,apiKey,data, data.external == "true"?true:false)
-                        }
-                    }
+                    makePayment(privateKey,publicKey,data, data.external == "true"?true:false)
                 }
                 var makePayment = function (privatekey, apikey, info, external) {
-                    const headers = { "Content-Type": "application/json" } ;
-                    headers["privatekey"] = privatekey;
-                    headers["apikey"] = apikey;
+                    const headers = { 
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + bearerToken
+                    };
                     var payment =   function (){
-                        return  fetch("https://cms.epayco.co/checkout/payment/session", {
+                        return  fetch("https://eks-apify-service.epayco.io/payment/session/create", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
                         })
-                            .then(res =>  res.json())
-                            .catch(err => err);
+                        .then(res =>  res.json())
+                        .catch(err => {
+                            console.log(err.message);
+                            bntPagar.style.pointerEvents = "auto";
+                            bntPagar.style.opacity = "1";
+                        });
                     }
                     payment()
                         .then(session => {
-                        link.classList.remove("disabled");
+                            bntPagar.style.pointerEvents = "all";
                             if(session.data.sessionId != undefined){
-                                localStorage.removeItem("sessionPayment");
-                                localStorage.setItem("sessionPayment", session.data.sessionId);
                                 const handlerNew = window.ePayco.checkout.configure({
                                     sessionId: session.data.sessionId,
                                     external: external,
@@ -362,18 +404,20 @@ class EpaycoConfig
                             }
                         })
                         .catch(error => {
-                        link.classList.remove("disabled");
-                            error.message;
-                            console.log(error.message);
+                            console.log("Depuración: Error en la creación de sesión:", error.message);
+                            bntPagar.style.pointerEvents = "auto";
+                            bntPagar.style.opacity = "1";
                         });
                 }
                 var openChekout = function () {
                     //handler.open(data);
                     openNewChekout()
+                    bntPagar.style.pointerEvents = "none";
+                    bntPagar.style.opacity = "0.5";
+                    console.log(data)
                 }
-                var bntPagar = document.getElementById("btn_epayco");
                 bntPagar.addEventListener("click", openChekout);
-                //openNewChekout()
+                //openChekout()
                 window.onload = function() {
                     document.addEventListener("contextmenu", function(e){
                         e.preventDefault();
@@ -389,42 +433,24 @@ class EpaycoConfig
             </script>
         </form>
         %s
-    ',  
-        $params['publicKey'],
-        $testMode,
-        $amount,
-        $sub_total,
-        $tax,
-        $description, 
-        $description,
-        strtolower($currencyCode), 
-        $testMode, 
-        $params['invoiceid'], 
-        $countryCode, 
-        $confirmationUrl, 
-        $confirmationUrl, 
-        $externalMode, 
-        $email, 
-        $billing_name, 
-        $address1,
-        $params['invoiceid'],
-        $invoiceData[0]->id,
-        $lang,
-        $ip,
+        ',  
         $params['publicKey'],
         $params['privateKey'],
+        $testMode,
+        $checkout,
+        $tokenBearer,
         $nota
     );
         return $code;
     }
     function epayco_getChargeDescription($invoceItems){
-    $descriptions = array();
-    foreach($invoceItems as $item){
-        $descriptions[] = $item['description'];
+        $descriptions = array();
+        foreach($invoceItems as $item){
+            $clearData = str_replace('_', ' ', $this->string_sanitize($item['description']));
+            $descriptions[] = $clearData;
+        }
+        return implode(' - ', $descriptions);
     }
-
-    return implode(' - ', $descriptions);
-}
 
     function epaycoConfirmation($gatewayOBJ,$informe,$confirmation=false)
     {
@@ -456,93 +482,54 @@ class EpaycoConfig
             Capsule::table("bapp_epayco")->insert(array("transaccion" => $informe_cobro, "momento" => date("Y-m-d H:i:s"), "gateway" => $gatewayModule, "refPayco" => $informe['x_ref_payco']));
         }
 
-        $this->callbackEpayco($informe,$confirmation);
-        $retorno = "200";
-        return $retorno;
+        return $this->callbackEpayco($informe,$confirmation);
     }
     function getPaymentEpayco($gateway, $transaccion)
     {        
-       $publicKey = $gateway['publicKey'];
-       $url = "https://apify.epayco.co/login";
-       $data = array(
-            'public_key' => $gateway['publicKey'],
-            'private_key' => $gateway['privateKey']
-        );
-        $json =$this->makeRequest($gateway,$data, $url,true);
-  
-        if(is_null($json)) {
-          throw new Exception("Error get bearer_token.");
-        } 
-        
-        $bearer_token = false;
-        if(isset($json->bearer_token)) {
-          $bearer_token=$json->bearer_token;
-        }else if(isset($json->token)){
-          $bearer_token= $json->token;
-        }
-        
-        if(!$bearer_token) {
-          $msj = isset($json->message) ? $json->message : "Error get bearer_token";
-          if($msj == "Error get bearer_token" && isset($json->error)){
-              $msj = $json->error;
-          }
-          throw new Exception($msj);
-        }
-  
+       $bearer_token = $this->ePaycoToken($gateway);
         $publicKey = $gateway['publicKey'];
-        $url = "https://apify.epayco.co/transaction/detail";
-        $data = array(
-            'filter' => [
-                'referencePayco' => $transaccion
-            ]
-        );
-   
-        $responseEpayco = $this->makeRequest($gateway,$data, $url, $bearer_token,'GET');
-          if($responseEpayco->success){
-              return $responseEpayco->data;
-          }else{
-             $url = "https://secure.payco.co/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
-              return $this->makeRequest($gateway,[], $url, $bearer_token);
-              //return false;
-          }
-        
+        $url = "https://eks-rest-pagos-service.epayco.io/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
+        return $this->makeRequest($gateway,[], $url, "Bearer ".$bearer_token);
     }
-    
-    function makeRequest($gateway,$data,$url,$bearerToken = false,$method = 'POST'){
+    function makeRequest($gateway,$data,$url,$bearerToken = false){
         $headers["Content-Type"] = 'application/json';
         if(!$bearerToken){
-            $header = array(
-                    'Content-Type: application/json',
-                    'Authorization: Bearer '.$bearerToken
-            );
+            $bearerToken = 'Bearer '.$token;
         }else{
             $token = base64_encode($gateway['publicKey'].":".$gateway['privateKey']);
-            $headers["Authorization"] = "Basic ".$token;
-            $header = array(
-                    'Content-Type: application/json',
-                    'Authorization: Basic '.$token
-            );
+            $bearerToken = 'Basic '.$token;
         }
             try {
-                $jsonData = json_encode($data);
+                $headers = array(
+                    'Content-Type: application/json',
+                    'Authorization: '.$bearerToken
+                  );
+                if(!empty($data)){
+                    $jsonData = json_encode($data);
+                }else{
+                    $jsonData = null;
+                }
+                
+
                 $curl = curl_init();
                 curl_setopt_array($curl, array(
-                  CURLOPT_URL => $url,
+                  CURLOPT_URL => 'https://eks-apify-service.epayco.io/login',
                   CURLOPT_RETURNTRANSFER => true,
                   CURLOPT_ENCODING => '',
                   CURLOPT_MAXREDIRS => 10,
                   CURLOPT_TIMEOUT => 0,
                   CURLOPT_FOLLOWLOCATION => true,
                   CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                  CURLOPT_CUSTOMREQUEST => $method,
-                  CURLOPT_HTTPHEADER => $header,
+                  CURLOPT_CUSTOMREQUEST => 'POST',
+                  CURLOPT_POSTFIELDS => $jsonData,
+                  CURLOPT_HTTPHEADER => $headers,
                 ));
-                $response = curl_exec($curl);
-                curl_close($curl);
+                $resp = curl_exec($curl);
                 if ($resp === false) {
                     return;
                 }
-                return json_decode($response);
+                curl_close($curl);
+                return json_decode($resp);
             } catch(\Exception $ex) {
                 throw new Exception("No se pudo consultar la transaccion: " . $ex->getMessage());
             }
@@ -590,32 +577,11 @@ class EpaycoConfig
             if ($invoice["result"] == 'success') {
            
                 if($confirmation){
-                     $validationData = $this->getPaymentEpayco($GATEWAY,$ref_payco);
-                     if(!$validationData){
-                         $validationData = $idtrans;
-                         $x_signature = $validationData['x_signature'];
-                         $x_extra1 = $validationData['x_extra1'];
-                         $x_extra2 = $validationData['x_extra2'];
-                         $x_amount = $validationData['x_amount'];
-                         $x_ref_payco = $validationData['x_ref_payco'];
-                     }else{
-                         $x_signature = $validationData->x_signature;
-                         $x_extra1 = $validationData->x_extra1;
-                         $x_extra2 = $validationData->x_extra2;
-                         $x_amount = $validationData->x_amount;
-                         $x_cod_response = $validationData->x_cod_response;
-                         $x_ref_payco = $validationData->x_ref_payco;
-                     }
+                     //$validationData = $this->getPaymentEpayco($GATEWAY,$ref_payco);
+                     $validationData = $idtrans;
                 }else{
                     $validationData = $idtrans;
-                    $x_signature = $validationData['x_signature'];
-                    $x_extra1 = $validationData['x_extra1'];
-                    $x_extra2 = $validationData['x_extra2'];
-                    $x_amount = $validationData['x_amount'];
-                    $x_cod_response = $validationData['x_cod_response'];
-                    $x_ref_payco = $validationData['x_ref_payco'];
                 }
-
                 $signature = hash('sha256',
                  trim($GATEWAY['customerID']).'^'
                  .trim($GATEWAY['p_key']).'^'
@@ -624,33 +590,34 @@ class EpaycoConfig
                  .$idtrans['x_amount'].'^'
                  .$idtrans['x_currency_code']
                 );
-
                 $invoiceData = Capsule::table('tblorders')
                     ->select('tblorders.amount')
-                    ->where('tblorders.invoiceid', '=', $x_extra1)
+                    ->where('tblorders.invoiceid', '=', $validationData['x_extra1'])
                     ->get();
-                                                                         
                 $invoiceAmount = $invoiceData[0]->amount;
-                if(floatval($invoiceAmount) === floatval($x_amount)){
+                $x_amount= $validationData['x_amount'];
+                /*if(floatval($invoiceAmount) === floatval($x_amount)){
                         $validation = true;
                 }else{
                     $validation = false;
-                }
+                }*/
+                $validation = true;
                 if(($signature == $validationData['x_signature'] || $validationData['x_signature'] == 'Authorized')  && $validation){
                 switch ((int)$validationData['x_cod_response']) {
                     case 1:{
+                        $message = 'AcceptOrder';
                         if($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled'){
                             addInvoicePayment(
                                 $invoice['invoiceid'],
-                                $x_ref_payco,
+                                $validationData['x_ref_payco'],
                                 $invoice['total'],
                                 null,
                                 $GATEWAY['paymentmethod']
                             );
                             logTransaction($GATEWAY['name'], $validationData, "Aceptada");
-                            $results = localAPI('AcceptOrder', $postData, $adminUsername);
+                            $results = localAPI($message, $postData, $adminUsername);
                             $command = "AddInvoicePayment";
-                            $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $mp_transaccion, "amount" => $x_amount);
+                            $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $mp_transaccion, "amount" => $validationData['x_amount']);
                             $results = localAPI($command, $postData, $adminUsername);
                             $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
                         }else{
@@ -658,7 +625,7 @@ class EpaycoConfig
                                 
                                 $productsOrder = Capsule::table('tblinvoiceitems')
                                     ->select('tblinvoiceitems.description')
-                                    ->where('tblinvoiceitems.invoiceid', '=', $x_extra2)
+                                    ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
                                     ->where('tblinvoiceitems.type', '=', 'Hosting')
                                     ->get();
                                 foreach ($productsOrder as $productOrder )
@@ -692,10 +659,10 @@ class EpaycoConfig
                                     $GATEWAY['paymentmethod']
                                 );
                                  logTransaction($GATEWAY['name'], $validationData, "Aceptada");
-                                $results = localAPI('AcceptOrder', $postData, $adminUsername);
+                                $results = localAPI($message, $postData, $adminUsername);
                                 $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
                                 $command = "AddInvoicePayment";
-                                $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $mp_transaccion, "amount" => $x_amount);
+                                $postData = array("gateway" => $GATEWAY["paymentmethod"], "invoiceid" => $mp_transaccion, "amount" => $validationData['x_amount']);
                                 $results = localAPI($command, $postData, $adminUsername);
                                 $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
                             }
@@ -704,16 +671,18 @@ class EpaycoConfig
                         }
                     }break;
                     case 2:{
+                        $message = 'CancelledOrder';
                         logTransaction($GATEWAY['name'], $validationData, "Cancelled");
                         if($invoice['status'] != 'Cancelled'){
                             $results = localAPI($command, $postData, $adminUsername);
                         }
                     }break;
                     case 3:{
+                        $message = 'PendingOrder';
                         if($invoice['status'] == 'Cancelled'){
                             $productsOrder = Capsule::table('tblinvoiceitems')
                                 ->select('tblinvoiceitems.description')
-                                ->where('tblinvoiceitems.invoiceid', '=', $x_extra2)
+                                ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra2'])
                                 ->where('tblinvoiceitems.type', '=', 'Hosting')
                                 ->get();
                             foreach ($productsOrder as $productOrder )
@@ -740,24 +709,28 @@ class EpaycoConfig
                         }
                     }break;
                     case 4:{
+                        $message = 'PendingOrder';
                         logTransaction($GATEWAY['name'], $validationData, "Failure");
                         if($invoice['status'] != 'Cancelled'){
                             $results = localAPI($command, $postData, $adminUsername);
                         }
                     }break;
                     case 6:{
+                        $message = 'PendingOrder';
                         logTransaction($GATEWAY['name'], $validationData, "Failure");
                         if($invoice['status'] != 'Cancelled'){
                             $results = localAPI($command, $postData, $adminUsername);
                         }
                     }break;
                     case 10:{
+                        $message = 'PendingOrder';
                         logTransaction($GATEWAY['name'], $validationData, "Failure");
                         if($invoice['status'] != 'Cancelled'){
                             $results = localAPI($command, $postData, $adminUsername);
                         }
                     }break;
                     case 11:{
+                        $message = 'PendingOrder';
                         logTransaction($GATEWAY['name'], $validationData, "Failure");
                         if($invoice['status'] != 'Cancelled'){
                             $results = localAPI($command, $postData, $adminUsername);
@@ -765,16 +738,17 @@ class EpaycoConfig
                     }break;
                 }
                 }else{
-                    echo "Firma no valida";
+                    $message = "Firma no valida";
                 }
             }
             else
             {
+                $message = "UndefinedOrder";
                 //BORRAR PORQUE YA FUE INGRESADA LA TRANSACCION
                 $resultado = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaccion)->delete();
             }
         }
-        return true;
+        return $message;
     }
     function procesarTodosRegistrosCallback($limiteRegistros = 10)
     {
@@ -808,6 +782,40 @@ class EpaycoConfig
     
         return $countries;
     }
+    function ePaycoToken($gateway){
+       $url = "https://eks-apify-service.epayco.io/login";
+       $data = array(
+            'public_key' => $gateway['publicKey'],
+            'private_key' => $gateway['privateKey']
+        );
+      
+        $json =$this->makeRequest($gateway,$data, $url,true);
+        
+        if(is_null($json)) {
+          throw new Exception("Error get bearer_token.");
+        } 
+        
+        $bearer_token = false;
+        if(isset($json->bearer_token)) {
+          $bearer_token=$json->bearer_token;
+        }else if(isset($json->token)){
+          $bearer_token= $json->token;
+        }
+        error_log(json_encode($json));
+        if(!$bearer_token) {
+          $msj = isset($json->message) ? $json->message : "Error get bearer_token";
+          if($msj == "Error get bearer_token" && isset($json->error)){
+              $msj = $json->error;
+          }
+          throw new Exception($msj);
+        }
+        return $bearer_token;
+    }
+    function epaycoSessionPayment($gateway,$data){
+        $bearer_token = $this->ePaycoToken($gateway);
+        $url = "https://eks-apify-service.epayco.io/payment/session/create";
+        return $this->makeRequest($gateway, $data, $url, "Bearer ".$bearer_token);
+    }
     function getCustomerIp(){
         $ipaddress = '';
         if (isset($_SERVER['HTTP_CLIENT_IP']))
@@ -827,6 +835,15 @@ class EpaycoConfig
         else
             $ipaddress = 'UNKNOWN';
         return $ipaddress;
+    }
+    function string_sanitize($string, $force_lowercase = true, $anal = false)
+    {
+
+        $strip = array("~", "`", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "=", "+", "[", "{", "]", "}", "\\", "|", ";", ":", "\"", "'", "&#8216;", "&#8217;", "&#8220;", "&#8221;", "&#8211;", "&#8212;", "â€”", "â€“", ",", "<", ".", ">", "/", "?");
+        $clean = trim(str_replace($strip, "", strip_tags($string)));
+        $clean = preg_replace('/\s+/', "_", $clean);
+        $clean = ($anal) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean;
+        return $clean;
     }
     function epayco_getAdminUserWithApiAccess(){
     try {
