@@ -38,9 +38,9 @@ if(!empty($_GET['ref_payco'])){
         $validationData = $_REQUEST;
         $obj->crearTablaCustomTransacciones();
         $respuesta = $obj->epaycoConfirmation($GATEWAY,$validationData,true);
-        
+        echo $respuesta;
         header("HTTP/1.1 " . $respuesta);
-        exit("Callback completo: " . var_export($respuesta,1));
+        exit("Callback completo: " . var_export(200,1));
     }
 }
 
