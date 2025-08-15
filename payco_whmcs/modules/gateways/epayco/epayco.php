@@ -304,7 +304,7 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://epayco-checkout-testing.s3.us-east-1.amazonaws.com/checkout.preprod.js">
+                src="https://checkout.epayco.co/checkout.js">
             </script>
             <script>
             const publicKey = "%s";
@@ -378,7 +378,7 @@ class EpaycoConfig
                         "Authorization": "Bearer " + bearerToken
                     };
                     var payment =   function (){
-                        return  fetch("https://eks-apify-service.epayco.io/payment/session/create", {
+                        return  fetch("https://apify.epayco.co/payment/session/create", {
                             method: "POST",
                             body: JSON.stringify(info),
                             headers
@@ -488,7 +488,7 @@ class EpaycoConfig
     {        
        $bearer_token = $this->ePaycoToken($gateway);
         $publicKey = $gateway['publicKey'];
-        $url = "https://eks-rest-pagos-service.epayco.io/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
+        $url = "https://secure.payco.co/transaction/response.json?ref_payco=".$transaccion."&&public_key=".$publicKey;
         return $this->makeRequest($gateway,[], $url, "Bearer ".$bearer_token);
     }
     function makeRequest($gateway,$data,$url,$bearerToken = false){
@@ -783,7 +783,7 @@ class EpaycoConfig
         return $countries;
     }
     function ePaycoToken($gateway){
-       $url = "https://eks-apify-service.epayco.io/login";
+       $url = "https://apify.epayco.co/login";
        $data = array(
             'public_key' => $gateway['publicKey'],
             'private_key' => $gateway['privateKey']
@@ -813,7 +813,7 @@ class EpaycoConfig
     }
     function epaycoSessionPayment($gateway,$data){
         $bearer_token = $this->ePaycoToken($gateway);
-        $url = "https://eks-apify-service.epayco.io/payment/session/create";
+        $url = "https://apify.epayco.co/payment/session/create";
         return $this->makeRequest($gateway, $data, $url, "Bearer ".$bearer_token);
     }
     function getCustomerIp(){
