@@ -43,5 +43,3 @@ if(!empty($_GET['ref_payco'])){
         exit("Callback completo: " . var_export(200,1));
     }
 }
-
-
