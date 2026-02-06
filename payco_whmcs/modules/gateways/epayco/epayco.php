@@ -274,8 +274,8 @@ class EpaycoConfig
             $token = $tokenResponse['token'];
         }
         $dataScript  = array(
-            "name"=>substr($description, 0, 50),
-            "description"=>substr($description, 0, 50),
+            "name"=>substr($description, 0, 240),
+            "description"=>substr($description, 0, 240),
             "invoice"=>(string)$params['invoiceid'],
             "currency"=>strtolower($currencyCode),
             "amount"=>floatval($amount),
