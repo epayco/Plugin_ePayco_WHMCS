@@ -230,12 +230,10 @@ class EpaycoConfig
         $address1 = $params['clientdetails']['address1'];
         $returnUrl = $params['returnurl'];
         $billing_name = $firstname . " " . $lastname;
-        if ($params['currencyCode'] == 'default') {
-            $clientDetails = localAPI("getclientsdetails", ["clientid" => $params['clientdetails']['userid'], "responsetype" => "json"], $params['WHMCSAdminUser']);
-            $currencyCode = strtolower($clientDetails['currency_code']);
-        } else {
-            $currencyCode = $params['currencyCode'];
-        }
+        
+        // Get store currency from client
+        $clientDetails = localAPI("getclientsdetails", ["clientid" => $params['clientdetails']['userid'], "responsetype" => "json"], $params['WHMCSAdminUser']);
+        $currencyCode = strtolower($clientDetails['currency_code']);
 
         $testMode = $params['testMode'] == 'on' ? true : false;
 
@@ -376,7 +374,7 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://checkout.epayco.co/checkout-v2.js">
+                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod-v2.js">
             </script>
             <script>
                 var bntPagar = document.getElementById("btn_epayco");
@@ -468,7 +466,7 @@ class EpaycoConfig
     {
         $bearer_token = $this->ePaycoToken($gateway);
         $publicKey = $gateway['publicKey'];
-        $url = "https://secure.payco.co/transaction/response.json?ref_payco=" . $transaccion . "&&public_key=" . $publicKey;
+        $url = "https://eks-rest-pagos-service.epayco.io/transaction/response.json?ref_payco=" . $transaccion . "&&public_key=" . $publicKey;
         return $this->makeRequest($gateway, [], $url, "Bearer " . $bearer_token);
     }
     function makeRequest($gateway, $data, $url, $bearerToken = false)
@@ -523,7 +521,7 @@ class EpaycoConfig
             'Authorization: Bearer ' . $bearer_token
         );
 
-        $url = 'https://apify.epayco.co/payment/session/create';
+        $url = 'https://eks-apify-service.epayco.io/payment/session/create';
         $responseData = $this->PostCurl($url, $body, $headers);
         $jsonData = @json_decode($responseData, true);
         return $jsonData;
@@ -552,7 +550,7 @@ class EpaycoConfig
         $data = array(
             'public_key' => $publicKey
         );
-        $url = 'https://apify.epayco.co/login';
+        $url = 'https://eks-apify-service.epayco.io/login';
         //return $this->epayco_realizar_llamada_api("login", [], $headers);
         $responseData = $this->PostCurl($url, $data, $headers);
         $jsonData = @json_decode($responseData, true);
@@ -975,7 +973,7 @@ class EpaycoConfig
     }
     function ePaycoToken($gateway)
     {
-        $url = "https://apify.epayco.co/login";
+        $url = "https://eks-apify-service.epayco.io/login";
         $data = array(
             'public_key' => $gateway['publicKey'],
             'private_key' => $gateway['privateKey']
@@ -1005,7 +1003,7 @@ class EpaycoConfig
     }
     function epaycoSessionPayment($gateway, $data, $bearer_token)
     {
-        $url = "https://apify.epayco.co/payment/session/create";
+        $url = "https://eks-apify-service.epayco.io/payment/session/create";
         return $this->makeRequest($gateway, $data, $url, "Bearer " . $bearer_token);
     }
     function getCustomerIp()
