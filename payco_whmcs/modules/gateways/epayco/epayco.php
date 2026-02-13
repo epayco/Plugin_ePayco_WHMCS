@@ -376,7 +376,7 @@ class EpaycoConfig
                 </center> 
             </p>
             <script
-                src="https://checkout.epayco.co/checkout-v2.js">
+                src="https://epayco-checkout-testing.s3.amazonaws.com/checkout.preprod-v2.js">
             </script>
             <script>
                 var bntPagar = document.getElementById("btn_epayco");
