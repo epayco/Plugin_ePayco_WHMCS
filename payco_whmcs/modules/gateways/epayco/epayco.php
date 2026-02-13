@@ -535,7 +535,7 @@ class EpaycoConfig
             'Authorization: Bearer ' . $bearer_token
         );
 
-        $url = 'https://apify.epayco.co/payment/session/create';
+        $url = 'https://eks-apify-service.epayco.io/payment/session/create';
         $responseData = $this->PostCurl($url, $body, $headers);
         $jsonData = @json_decode($responseData, true);
         return $jsonData;
@@ -564,7 +564,7 @@ class EpaycoConfig
         $data = array(
             'public_key' => $publicKey
         );
-        $url = 'https://apify.epayco.co/login';
+        $url = 'https://eks-apify-service.epayco.io/login';
         //return $this->epayco_realizar_llamada_api("login", [], $headers);
         $responseData = $this->PostCurl($url, $data, $headers);
         $jsonData = @json_decode($responseData, true);
@@ -1103,7 +1103,7 @@ class EpaycoConfig
     }
     function ePaycoToken($gateway)
     {
-        $url = "https://apify.epayco.co/login";
+        $url = "https://eks-apify-service.epayco.io/login";
         $data = array(
             'public_key' => $gateway['publicKey'],
             'private_key' => $gateway['privateKey']
@@ -1133,7 +1133,7 @@ class EpaycoConfig
     }
     function epaycoSessionPayment($gateway, $data, $bearer_token)
     {
-        $url = "https://apify.epayco.co/payment/session/create";
+        $url = "https://eks-apify-service.epayco.io/payment/session/create";
         return $this->makeRequest($gateway, $data, $url, "Bearer " . $bearer_token);
     }
     function getCustomerIp()
