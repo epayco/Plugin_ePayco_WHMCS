@@ -685,10 +685,6 @@ class EpaycoConfig
                 if (($signature == $validationData['x_signature'] || $validationData['x_signature'] == 'Authorized')  && $validation) {
                     switch ((int)$validationData['x_cod_response']) {
                         case 1: {
-                                echo "<pre style='background:green;color:white;'>DEBUG CASE 1 - ACCEPTED</pre>";
-                                var_dump("Entering case 1");
-                                var_dump("Invoice Status: " . $invoice['status']);
-                                
                                 $message = 'AcceptOrder';
                                 if ($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled') {
                                     // Check if there were previous retry attempts
@@ -698,14 +694,10 @@ class EpaycoConfig
                                     // hadPreviousFails = false if: no transaction OR momento is not the special flag (direct payment)
                                     $hadPreviousFails = ($result && $result->momento === '0000-00-00 00:00:00');
                                     
-                                    echo "<pre>DEBUG CASE 1: Previous failed attempts check</pre>";
-                                    var_dump("Had previous fails: " . ($hadPreviousFails ? "YES" : "NO"));
-                                    
                                     if ($hadPreviousFails) {
                                         // There were previous failed attempts that we restored stock for
                                         // WHMCS already discounted on first attempt, we restored for each failure
                                         // Now we must discount again because payment succeeded
-                                        echo "<pre>DEBUG CASE 1: RETRY PAYMENT - Will discount stock (was restored by previous failures)</pre>";
                                         
                                         $productInfo = array();
                                         $productData = array();
@@ -716,49 +708,28 @@ class EpaycoConfig
                                             ->where('tblinvoiceitems.type', '=', 'Hosting')
                                             ->get();
                                         
-                                        echo "<pre>DEBUG CASE 1: Products obtained</pre>";
-                                        var_dump($productsOrder);
-                                        
                                         foreach ($productsOrder as $productOrder) {
                                             $explodProduct = explode(' - ', $productOrder->description, 2);
                                             $productInfo[] = $explodProduct[0];
                                         }
                                         
-                                        echo "<pre>DEBUG CASE 1: Product Info Array</pre>";
-                                        var_dump($productInfo);
-                                        
                                         if (!empty($productInfo)) {
-                                            echo "<pre>DEBUG CASE 1: Entering IF with non-empty productInfo</pre>";
                                             $products = Capsule::table('tblproducts')
                                                 ->whereIn('name', $productInfo)
                                                 ->get(['name', 'qty'])
                                                 ->all();
-
-                                            echo "<pre>DEBUG CASE 1: Products from DB</pre>";
-                                            var_dump($products);
 
                                             for ($i = 0; $i < count($products); $i++) {
                                                 $productData[$i]["name"] = $products[$i]->name;
                                                 $productData[$i]["qty"] =  $products[$i]->qty - 1;
                                             }
 
-                                            echo "<pre>DEBUG CASE 1: Product Data Array after subtracting qty</pre>";
-                                            var_dump($productData);
-
                                             for ($j = 0; $j < count($productData); $j++) {
                                                 Capsule::table('tblproducts')
                                                     ->where('name', "=", $productData[$j]["name"])
                                                     ->update(['qty' => $productData[$j]["qty"]]);
                                             }
-                                            
-                                            echo "<pre style='background:lightgreen;'>DEBUG CASE 1: Stock discounted successfully (1 unit)</pre>";
-                                        } else {
-                                            echo "<pre>DEBUG CASE 1: ProductInfo is empty - NO PRODUCTS TO DISCOUNT STOCK</pre>";
                                         }
-                                    } else {
-                                        // Direct payment without previous failures - WHMCS already discounted stock
-                                        // Do NOT discount again
-                                        echo "<pre>DEBUG CASE 1: DIRECT PAYMENT - WHMCS already discounted stock, skipping stock adjustment</pre>";
                                     }
                                     
                                     addInvoicePayment(
@@ -784,16 +755,12 @@ class EpaycoConfig
                             break;
                         case 2: {
                                 //rejected - restore stock without duplicating
-                                echo "<pre>DEBUG CASE 2 - REJECTED: Checking duplicates</pre>";
                                 $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                var_dump("Existing transaction: " . ($result ? "YES" : "NO"));
                                 
                                 // Check if already processed (momento = 0000-00-00 is the flag)
                                 $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                var_dump("Already processed: " . ($alreadyProcessed ? "YES" : "NO"));
                                 
                                 if ($result && !$alreadyProcessed) {
-                                    echo "<pre>DEBUG: Processing rejected</pre>";
                                     logTransaction($GATEWAY['name'], $validationData, "Rejected");
 
                                     $productInfo = array();
@@ -805,69 +772,43 @@ class EpaycoConfig
                                         ->where('tblinvoiceitems.type', '=', 'Hosting')
                                         ->get();
                                     
-                                    echo "<pre>DEBUG: Productos obtenidos</pre>";
-                                    var_dump($productsOrder);
-                                    
                                     foreach ($productsOrder as $productOrder) {
                                         $explodProduct = explode(' - ', $productOrder->description, 2);
                                         $productInfo[] = $explodProduct[0];
                                     }
                                     
-                                    echo "<pre>DEBUG: Product Info Array</pre>";
-                                    var_dump($productInfo);
-                                    
                                     if (!empty($productInfo)) {
-                                        echo "<pre>DEBUG: Entrando al IF de productInfo no vacío</pre>";
                                         $products = Capsule::table('tblproducts')
                                             ->whereIn('name', $productInfo)
                                             ->get(['name', 'qty'])
                                             ->all();
-
-                                        echo "<pre>DEBUG: Productos de DB</pre>";
-                                        var_dump($products);
 
                                         for ($i = 0; $i < count($products); $i++) {
                                             $productData[$i]["name"] = $products[$i]->name;
                                             $productData[$i]["qty"] =  $products[$i]->qty + 1;
                                         }
 
-                                        echo "<pre>DEBUG: Product Data Array después de sumar qty</pre>";
-                                        var_dump($productData);
-
                                         for ($j = 0; $j < count($productData); $j++) {
                                             Capsule::table('tblproducts')
                                                 ->where('name', "=", $productData[$j]["name"])
                                                 ->update(['qty' => $productData[$j]["qty"]]);
                                         }
-                                        
-                                        echo "<pre style='background:lightgreen;'>DEBUG: Stock actualizado exitosamente</pre>";
-                                    } else {
-                                        echo "<pre>DEBUG: ProductInfo está vacío - NO HAY PRODUCTOS PARA AUMENTAR STOCK</pre>";
                                     }
                                     
                                     // Mark as processed (without deleting, so it doesn't reinsert)
-                                    echo "<pre>DEBUG: Marking transaction as processed</pre>";
                                     Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                } else {
-                                    echo "<pre style='background:yellow;'>DEBUG CASE 2: Transaction ALREADY PROCESSED, ignoring</pre>";
                                 }
                                 
                                 $message = 'RejectedPayment';
                             }
                             break;
                         case 3: {
-                                echo "<pre style='background:orange;color:white;'>DEBUG CASE 3 - PENDING</pre>";
-                                var_dump("Entering case 3");
-                                var_dump("Invoice Status: " . $invoice['status']);
-                                
                                 // Check for duplicates
                                 $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
                                 $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                var_dump("Already processed: " . ($alreadyProcessed ? "YES" : "NO"));
                                 
                                 if ($result && !$alreadyProcessed) {
                                     //pending - restore stock
-                                    echo "<pre>DEBUG CASE 3: Processing pending</pre>";
                                     logTransaction($GATEWAY['name'], $validationData, "Failure");
 
                                     $productInfo = array();
@@ -879,44 +820,27 @@ class EpaycoConfig
                                         ->where('tblinvoiceitems.type', '=', 'Hosting')
                                         ->get();
                                     
-                                    echo "<pre>DEBUG CASE 3: Productos obtenidos</pre>";
-                                    var_dump($productsOrder);
-                                    
                                     foreach ($productsOrder as $productOrder) {
                                         $explodProduct = explode(' - ', $productOrder->description, 2);
                                         $productInfo[] = $explodProduct[0];
                                     }
                                     
-                                    echo "<pre>DEBUG CASE 3: Product Info Array</pre>";
-                                    var_dump($productInfo);
-                                    
                                     if (!empty($productInfo)) {
-                                        echo "<pre>DEBUG CASE 3: Entrando al IF de productInfo no vacío</pre>";
                                         $products = Capsule::table('tblproducts')
                                             ->whereIn('name', $productInfo)
                                             ->get(['name', 'qty'])
                                             ->all();
-
-                                        echo "<pre>DEBUG CASE 3: Productos de DB</pre>";
-                                        var_dump($products);
 
                                         for ($i = 0; $i < count($products); $i++) {
                                             $productData[$i]["name"] = $products[$i]->name;
                                             $productData[$i]["qty"] =  $products[$i]->qty + 1;
                                         }
 
-                                        echo "<pre>DEBUG CASE 3: Product Data Array después de sumar qty</pre>";
-                                        var_dump($productData);
-
                                         for ($j = 0; $j < count($productData); $j++) {
                                             Capsule::table('tblproducts')
                                                 ->where('name', "=", $productData[$j]["name"])
                                                 ->update(['qty' => $productData[$j]["qty"]]);
                                         }
-                                        
-                                        echo "<pre style='background:lightsalmon;'>DEBUG CASE 3: Stock updated successfully</pre>";
-                                    } else {
-                                        echo "<pre>DEBUG CASE 3: ProductInfo is empty - NO PRODUCTS TO INCREASE STOCK</pre>";
                                     }
 
                                     if ($invoice['status'] != 'Cancelled') {
@@ -925,26 +849,17 @@ class EpaycoConfig
                                     }
                                     
                                     // Mark as processed
-                                    echo "<pre>DEBUG CASE 3: Marking as processed</pre>";
                                     Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                } else {
-                                    echo "<pre style='background:orange;'>DEBUG CASE 3: ALREADY PROCESSED, ignoring</pre>";
                                 }
                             }
                             break;
                         case 4: {
-                                echo "<pre style='background:red;color:white;'>DEBUG CASE 4 - FAILED</pre>";
-                                var_dump("Entering case 4");
-                                var_dump("Invoice Status: " . $invoice['status']);
-                                
                                 // Check for duplicates
                                 $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
                                 $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                var_dump("Already processed: " . ($alreadyProcessed ? "YES" : "NO"));
                                 
                                 if ($result && !$alreadyProcessed) {
                                     //failed - restore stock
-                                    echo "<pre>DEBUG CASE 4: Processing failed</pre>";
                                     logTransaction($GATEWAY['name'], $validationData, "Failure");
 
                                     $productInfo = array();
@@ -956,44 +871,27 @@ class EpaycoConfig
                                         ->where('tblinvoiceitems.type', '=', 'Hosting')
                                         ->get();
                                     
-                                    echo "<pre>DEBUG CASE 4: Productos obtenidos</pre>";
-                                    var_dump($productsOrder);
-                                    
                                     foreach ($productsOrder as $productOrder) {
                                         $explodProduct = explode(' - ', $productOrder->description, 2);
                                         $productInfo[] = $explodProduct[0];
                                     }
                                     
-                                    echo "<pre>DEBUG CASE 4: Product Info Array</pre>";
-                                    var_dump($productInfo);
-                                    
                                     if (!empty($productInfo)) {
-                                        echo "<pre>DEBUG CASE 4: Entrando al IF de productInfo no vacío</pre>";
                                         $products = Capsule::table('tblproducts')
                                             ->whereIn('name', $productInfo)
                                             ->get(['name', 'qty'])
                                             ->all();
-
-                                        echo "<pre>DEBUG CASE 4: Productos de DB</pre>";
-                                        var_dump($products);
 
                                         for ($i = 0; $i < count($products); $i++) {
                                             $productData[$i]["name"] = $products[$i]->name;
                                             $productData[$i]["qty"] =  $products[$i]->qty + 1;
                                         }
 
-                                        echo "<pre>DEBUG CASE 4: Product Data Array después de sumar qty</pre>";
-                                        var_dump($productData);
-
                                         for ($j = 0; $j < count($productData); $j++) {
                                             Capsule::table('tblproducts')
                                                 ->where('name', "=", $productData[$j]["name"])
                                                 ->update(['qty' => $productData[$j]["qty"]]);
                                         }
-                                        
-                                        echo "<pre style='background:lightcoral;'>DEBUG CASE 4: Stock updated successfully</pre>";
-                                    } else {
-                                        echo "<pre>DEBUG CASE 4: ProductInfo is empty - NO PRODUCTS TO INCREASE STOCK</pre>";
                                     }
 
                                     if ($invoice['status'] != 'Cancelled') {
@@ -1002,26 +900,17 @@ class EpaycoConfig
                                     }
                                     
                                     // Mark as processed
-                                    echo "<pre>DEBUG CASE 4: Marking as processed</pre>";
                                     Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                } else {
-                                    echo "<pre style='background:red;'>DEBUG CASE 4: ALREADY PROCESSED, ignoring</pre>";
                                 }
                             }
                             break;
                         case 6: {
-                                echo "<pre style='background:purple;color:white;'>DEBUG CASE 6</pre>";
-                                var_dump("Entering case 6");
-                                var_dump("Invoice Status: " . $invoice['status']);
-                                
                                 // Check for duplicates
                                 $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
                                 $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                var_dump("Already processed: " . ($alreadyProcessed ? "YES" : "NO"));
                                 
                                 if ($result && !$alreadyProcessed) {
                                     //pending - restore stock
-                                    echo "<pre>DEBUG CASE 6: Processing</pre>";
                                     logTransaction($GATEWAY['name'], $validationData, "Failure");
 
                                     $productInfo = array();
@@ -1033,44 +922,27 @@ class EpaycoConfig
                                         ->where('tblinvoiceitems.type', '=', 'Hosting')
                                         ->get();
                                     
-                                    echo "<pre>DEBUG CASE 6: Productos obtenidos</pre>";
-                                    var_dump($productsOrder);
-                                    
                                     foreach ($productsOrder as $productOrder) {
                                         $explodProduct = explode(' - ', $productOrder->description, 2);
                                         $productInfo[] = $explodProduct[0];
                                     }
                                     
-                                    echo "<pre>DEBUG CASE 6: Product Info Array</pre>";
-                                    var_dump($productInfo);
-                                    
                                     if (!empty($productInfo)) {
-                                        echo "<pre>DEBUG CASE 6: Entrando al IF de productInfo no vacío</pre>";
                                         $products = Capsule::table('tblproducts')
                                             ->whereIn('name', $productInfo)
                                             ->get(['name', 'qty'])
                                             ->all();
-
-                                        echo "<pre>DEBUG CASE 6: Productos de DB</pre>";
-                                        var_dump($products);
 
                                         for ($i = 0; $i < count($products); $i++) {
                                             $productData[$i]["name"] = $products[$i]->name;
                                             $productData[$i]["qty"] =  $products[$i]->qty + 1;
                                         }
 
-                                        echo "<pre>DEBUG CASE 6: Product Data Array después de sumar qty</pre>";
-                                        var_dump($productData);
-
                                         for ($j = 0; $j < count($productData); $j++) {
                                             Capsule::table('tblproducts')
                                                 ->where('name', "=", $productData[$j]["name"])
                                                 ->update(['qty' => $productData[$j]["qty"]]);
                                         }
-                                        
-                                        echo "<pre style='background:lightyellow;'>DEBUG CASE 6: Stock updated successfully</pre>";
-                                    } else {
-                                        echo "<pre>DEBUG CASE 6: ProductInfo is empty - NO PRODUCTS TO INCREASE STOCK</pre>";
                                     }
 
                                     if ($invoice['status'] != 'Cancelled') {
@@ -1079,26 +951,17 @@ class EpaycoConfig
                                     }
                                     
                                     // Mark as processed
-                                    echo "<pre>DEBUG CASE 6: Marking as processed</pre>";
                                     Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                } else {
-                                    echo "<pre style='background:purple;'>DEBUG CASE 6: ALREADY PROCESSED, ignoring</pre>";
                                 }
                             }
                             break;
                         case 10: {
-                                echo "<pre style='background:navy;color:white;'>DEBUG CASE 10</pre>";
-                                var_dump("Entering case 10");
-                                var_dump("Invoice Status: " . $invoice['status']);
-                                
                                 // Check for duplicates
                                 $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
                                 $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                var_dump("Already processed: " . ($alreadyProcessed ? "YES" : "NO"));
                                 
                                 if ($result && !$alreadyProcessed) {
                                     //pending - restore stock
-                                    echo "<pre>DEBUG CASE 10: Processing</pre>";
                                     logTransaction($GATEWAY['name'], $validationData, "Failure");
 
                                     $productInfo = array();
@@ -1110,44 +973,27 @@ class EpaycoConfig
                                         ->where('tblinvoiceitems.type', '=', 'Hosting')
                                         ->get();
                                     
-                                    echo "<pre>DEBUG CASE 10: Productos obtenidos</pre>";
-                                    var_dump($productsOrder);
-                                    
                                     foreach ($productsOrder as $productOrder) {
                                         $explodProduct = explode(' - ', $productOrder->description, 2);
                                         $productInfo[] = $explodProduct[0];
                                     }
                                     
-                                    echo "<pre>DEBUG CASE 10: Product Info Array</pre>";
-                                    var_dump($productInfo);
-                                    
                                     if (!empty($productInfo)) {
-                                        echo "<pre>DEBUG CASE 10: Entrando al IF de productInfo no vacío</pre>";
                                         $products = Capsule::table('tblproducts')
                                             ->whereIn('name', $productInfo)
                                             ->get(['name', 'qty'])
                                             ->all();
-
-                                        echo "<pre>DEBUG CASE 10: Productos de DB</pre>";
-                                        var_dump($products);
 
                                         for ($i = 0; $i < count($products); $i++) {
                                             $productData[$i]["name"] = $products[$i]->name;
                                             $productData[$i]["qty"] =  $products[$i]->qty + 1;
                                         }
 
-                                        echo "<pre>DEBUG CASE 10: Product Data Array después de sumar qty</pre>";
-                                        var_dump($productData);
-
                                         for ($j = 0; $j < count($productData); $j++) {
                                             Capsule::table('tblproducts')
                                                 ->where('name', "=", $productData[$j]["name"])
                                                 ->update(['qty' => $productData[$j]["qty"]]);
                                         }
-                                        
-                                        echo "<pre style='background:lightblue;'>DEBUG CASE 10: Stock updated successfully</pre>";
-                                    } else {
-                                        echo "<pre>DEBUG CASE 10: ProductInfo is empty - NO PRODUCTS TO INCREASE STOCK</pre>";
                                     }
 
                                     if ($invoice['status'] != 'Cancelled') {
@@ -1156,26 +1002,17 @@ class EpaycoConfig
                                     }
                                     
                                     // Mark as processed
-                                    echo "<pre>DEBUG CASE 10: Marking as processed</pre>";
                                     Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                } else {
-                                    echo "<pre style='background:navy;'>DEBUG CASE 10: ALREADY PROCESSED, ignoring</pre>";
                                 }
                             }
                             break;
                         case 11: {
-                                echo "<pre style='background:teal;color:white;'>DEBUG CASE 11</pre>";
-                                var_dump("Entering case 11");
-                                var_dump("Invoice Status: " . $invoice['status']);
-                                
                                 // Check for duplicates
                                 $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
                                 $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                var_dump("Already processed: " . ($alreadyProcessed ? "YES" : "NO"));
                                 
                                 if ($result && !$alreadyProcessed) {
                                     //pending - restore stock
-                                    echo "<pre>DEBUG CASE 11: Processing</pre>";
                                     logTransaction($GATEWAY['name'], $validationData, "Failure");
 
                                     $productInfo = array();
@@ -1187,44 +1024,27 @@ class EpaycoConfig
                                         ->where('tblinvoiceitems.type', '=', 'Hosting')
                                         ->get();
                                     
-                                    echo "<pre>DEBUG CASE 11: Productos obtenidos</pre>";
-                                    var_dump($productsOrder);
-                                    
                                     foreach ($productsOrder as $productOrder) {
                                         $explodProduct = explode(' - ', $productOrder->description, 2);
                                         $productInfo[] = $explodProduct[0];
                                     }
                                     
-                                    echo "<pre>DEBUG CASE 11: Product Info Array</pre>";
-                                    var_dump($productInfo);
-                                    
                                     if (!empty($productInfo)) {
-                                        echo "<pre>DEBUG CASE 11: Entrando al IF de productInfo no vacío</pre>";
                                         $products = Capsule::table('tblproducts')
                                             ->whereIn('name', $productInfo)
                                             ->get(['name', 'qty'])
                                             ->all();
-
-                                        echo "<pre>DEBUG CASE 11: Productos de DB</pre>";
-                                        var_dump($products);
 
                                         for ($i = 0; $i < count($products); $i++) {
                                             $productData[$i]["name"] = $products[$i]->name;
                                             $productData[$i]["qty"] =  $products[$i]->qty + 1;
                                         }
 
-                                        echo "<pre>DEBUG CASE 11: Product Data Array después de sumar qty</pre>";
-                                        var_dump($productData);
-
                                         for ($j = 0; $j < count($productData); $j++) {
                                             Capsule::table('tblproducts')
                                                 ->where('name', "=", $productData[$j]["name"])
                                                 ->update(['qty' => $productData[$j]["qty"]]);
                                         }
-                                        
-                                        echo "<pre style='background:lightseagreen;'>DEBUG CASE 11: Stock updated successfully</pre>";
-                                    } else {
-                                        echo "<pre>DEBUG CASE 11: ProductInfo is empty - NO PRODUCTS TO INCREASE STOCK</pre>";
                                     }
 
                                     if ($invoice['status'] != 'Cancelled') {
@@ -1233,10 +1053,7 @@ class EpaycoConfig
                                     }
                                     
                                     // Mark as processed
-                                    echo "<pre>DEBUG CASE 11: Marking as processed</pre>";
                                     Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                } else {
-                                    echo "<pre style='background:teal;'>DEBUG CASE 11: ALREADY PROCESSED, ignoring</pre>";
                                 }
                             }
                             break;
