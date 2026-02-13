@@ -26,22 +26,10 @@ class EpaycoConfig
                     $table->dateTime("momento");
                     $table->string("gateway");
                     $table->string("refPayco");
-                    $table->integer("reintentos_count")->default(0);
                 });
                 return true;
             } catch (\Exception $ex) {
                 throw new Exception("No se pudo crear la tabla de transacciones: " . $ex->getMessage());
-            }
-        } else {
-            // Agregar columna si no existe
-            if (!WHMCS\Database\Capsule::schema()->hasColumn($nombreTabla, 'reintentos_count')) {
-                try {
-                    WHMCS\Database\Capsule::schema()->table($nombreTabla, function ($table) {
-                        $table->integer('reintentos_count')->default(0);
-                    });
-                } catch (\Exception $ex) {
-                    // Columna ya existe o error
-                }
             }
         }
         return false;
