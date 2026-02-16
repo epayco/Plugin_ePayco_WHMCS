@@ -639,19 +639,17 @@ class EpaycoConfig
 
     function handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, $logType = "Failure")
     {
-        // Verificar si ya fue procesado
+      
         $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
         $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
 
-        // Si no fue procesado, hacer todo
         if ($result && !$alreadyProcessed) {
-            // Registrar log
+       
             logTransaction($GATEWAY['name'], $validationData, $logType);
 
-            // Restaurar stock (llamar la función que creamos)
+          
             $this->restoreProductStock($validationData['x_extra1'], 1);
 
-            // Marcar como procesado
             Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
         }
     }
@@ -728,17 +726,13 @@ class EpaycoConfig
                         case 1: {
                                 $message = 'AcceptOrder';
                                 if ($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled') {
-                                    // Check if there were previous retry attempts
                                     $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
 
-                                    // hadPreviousFails = true if: transaction exists AND momento='0000-00-00 00:00:00' (was marked as processed after failure)
-                                    // hadPreviousFails = false if: no transaction OR momento is not the special flag (direct payment)
+                                    // Check if transaction had previous failed attempts: momento='0000-00-00 00:00:00' marks processed failures
                                     $hadPreviousFails = ($result && $result->momento === '0000-00-00 00:00:00');
 
                                     if ($hadPreviousFails) {
-                                        // There were previous failed attempts that we restored stock for
-                                        // WHMCS already discounted on first attempt, we restored for each failure
-                                        // Now we must discount again because payment succeeded
+                                        // Discount stock again since payment succeeded after previous failures where we restored it
                                         $this->restoreProductStock($validationData['x_extra1'], -1);
                                     }
 
@@ -751,7 +745,7 @@ class EpaycoConfig
                                     );
                                     logTransaction($GATEWAY['name'], $validationData, "Accepted");
                                     $results = localAPI($message, $postData, $adminUsername);
-                                    // Transaction is recorded in WHMCS (without duplicating payment)
+                                  
                                     $command = "AddTransaction";
                                     $postData = array(
                                         "userid" => $invoice['userid'],
