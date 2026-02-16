@@ -313,7 +313,7 @@ class EpaycoConfig
 
         $checkoutSessionResponse = $this->epaycoSessionCheckout($token, $dataScript);
         $sessionId = null;
-        
+
         if (is_array($checkoutSessionResponse) && isset($checkoutSessionResponse['success']) && $checkoutSessionResponse['success']) {
             if (isset($checkoutSessionResponse['data']) && is_array($checkoutSessionResponse['data'])) {
                 $sessionId = $checkoutSessionResponse["data"]['sessionId'];
@@ -321,7 +321,7 @@ class EpaycoConfig
         } else {
             $messageError = (is_array($checkoutSessionResponse) && isset($checkoutSessionResponse['textResponse'])) ? $checkoutSessionResponse['textResponse'] : '';
             $errorMessage = "";
-            
+
             if (isset($checkoutSessionResponse['data']['errors'])) {
                 $errors = $checkoutSessionResponse['data']['errors'];
                 if (is_array($errors)) {
@@ -339,7 +339,7 @@ class EpaycoConfig
                     }
                 }
             }
-            
+
             $processReturnFailMessage = !empty($errorMessage) ? $errorMessage : $messageError;
             echo sprintf(
                 '<div style="
@@ -358,7 +358,7 @@ class EpaycoConfig
             );
             return;
         }
-        
+
         $payload = array(
             'sessionId' => $sessionId,
             'type' => $externalMode,
@@ -604,7 +604,60 @@ class EpaycoConfig
     }
 
 
-       function callbackEpayco($idtrans, $confirmation)
+    function restoreProductStock($invoiceId, $quantityChange = 1)
+    {
+        // Obtener descripciones de productos del invoice
+        $productInfo = array();
+
+        $productsOrder = Capsule::table('tblinvoiceitems')
+            ->select('tblinvoiceitems.description')
+            ->where('tblinvoiceitems.invoiceid', '=', $invoiceId)
+            ->where('tblinvoiceitems.type', '=', 'Hosting')
+            ->get();
+
+        foreach ($productsOrder as $productOrder) {
+            $explodProduct = explode(' - ', $productOrder->description, 2);
+            $productInfo[] = $explodProduct[0];
+        }
+
+        // Actualizar cantidad en tblproducts
+        if (!empty($productInfo)) {
+            $products = Capsule::table('tblproducts')
+                ->whereIn('name', $productInfo)
+                ->get(['name', 'qty'])
+                ->all();
+
+            foreach ($products as $product) {
+                $newQty = $product->qty + $quantityChange;
+                Capsule::table('tblproducts')
+                    ->where('name', "=", $product->name)
+                    ->update(['qty' => $newQty]);
+            }
+        }
+    }
+
+
+    function handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, $logType = "Failure")
+    {
+        // Verificar si ya fue procesado
+        $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
+        $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
+
+        // Si no fue procesado, hacer todo
+        if ($result && !$alreadyProcessed) {
+            // Registrar log
+            logTransaction($GATEWAY['name'], $validationData, $logType);
+
+            // Restaurar stock (llamar la función que creamos)
+            $this->restoreProductStock($validationData['x_extra1'], 1);
+
+            // Marcar como procesado
+            Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
+        }
+    }
+
+
+    function callbackEpayco($idtrans, $confirmation)
     {
 
         if ($confirmation) {
@@ -677,49 +730,18 @@ class EpaycoConfig
                                 if ($invoice['status'] != 'Paid' && $invoice['status'] != 'Cancelled') {
                                     // Check if there were previous retry attempts
                                     $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                    
+
                                     // hadPreviousFails = true if: transaction exists AND momento='0000-00-00 00:00:00' (was marked as processed after failure)
                                     // hadPreviousFails = false if: no transaction OR momento is not the special flag (direct payment)
                                     $hadPreviousFails = ($result && $result->momento === '0000-00-00 00:00:00');
-                                    
+
                                     if ($hadPreviousFails) {
                                         // There were previous failed attempts that we restored stock for
                                         // WHMCS already discounted on first attempt, we restored for each failure
                                         // Now we must discount again because payment succeeded
-                                        
-                                        $productInfo = array();
-                                        $productData = array();
-                                        
-                                        $productsOrder = Capsule::table('tblinvoiceitems')
-                                            ->select('tblinvoiceitems.description')
-                                            ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                            ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                            ->get();
-                                        
-                                        foreach ($productsOrder as $productOrder) {
-                                            $explodProduct = explode(' - ', $productOrder->description, 2);
-                                            $productInfo[] = $explodProduct[0];
-                                        }
-                                        
-                                        if (!empty($productInfo)) {
-                                            $products = Capsule::table('tblproducts')
-                                                ->whereIn('name', $productInfo)
-                                                ->get(['name', 'qty'])
-                                                ->all();
-
-                                            for ($i = 0; $i < count($products); $i++) {
-                                                $productData[$i]["name"] = $products[$i]->name;
-                                                $productData[$i]["qty"] =  $products[$i]->qty - 1;
-                                            }
-
-                                            for ($j = 0; $j < count($productData); $j++) {
-                                                Capsule::table('tblproducts')
-                                                    ->where('name', "=", $productData[$j]["name"])
-                                                    ->update(['qty' => $productData[$j]["qty"]]);
-                                            }
-                                        }
+                                        $this->restoreProductStock($validationData['x_extra1'], -1);
                                     }
-                                    
+
                                     addInvoicePayment(
                                         $invoice['invoiceid'],
                                         $validationData['x_ref_payco'],
@@ -742,306 +764,63 @@ class EpaycoConfig
                             }
                             break;
                         case 2: {
-                                //rejected - restore stock without duplicating
-                                $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                
-                                // Check if already processed (momento = 0000-00-00 is the flag)
-                                $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                
-                                if ($result && !$alreadyProcessed) {
-                                    logTransaction($GATEWAY['name'], $validationData, "Rejected");
+                              
+                                $this->handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, "Rejected");
 
-                                    $productInfo = array();
-                                    $productData = array();
-                                    
-                                    $productsOrder = Capsule::table('tblinvoiceitems')
-                                        ->select('tblinvoiceitems.description')
-                                        ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                        ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                        ->get();
-                                    
-                                    foreach ($productsOrder as $productOrder) {
-                                        $explodProduct = explode(' - ', $productOrder->description, 2);
-                                        $productInfo[] = $explodProduct[0];
-                                    }
-                                    
-                                    if (!empty($productInfo)) {
-                                        $products = Capsule::table('tblproducts')
-                                            ->whereIn('name', $productInfo)
-                                            ->get(['name', 'qty'])
-                                            ->all();
-
-                                        for ($i = 0; $i < count($products); $i++) {
-                                            $productData[$i]["name"] = $products[$i]->name;
-                                            $productData[$i]["qty"] =  $products[$i]->qty + 1;
-                                        }
-
-                                        for ($j = 0; $j < count($productData); $j++) {
-                                            Capsule::table('tblproducts')
-                                                ->where('name', "=", $productData[$j]["name"])
-                                                ->update(['qty' => $productData[$j]["qty"]]);
-                                        }
-                                    }
-                                    
-                                    // Mark as processed (without deleting, so it doesn't reinsert)
-                                    Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
-                                }
-                                
                                 $message = 'RejectedPayment';
                             }
                             break;
                         case 3: {
-                                // Check for duplicates
-                                $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                
-                                if ($result && !$alreadyProcessed) {
-                                    //pending - restore stock
-                                    logTransaction($GATEWAY['name'], $validationData, "Failure");
+                              
 
-                                    $productInfo = array();
-                                    $productData = array();
-                                    
-                                    $productsOrder = Capsule::table('tblinvoiceitems')
-                                        ->select('tblinvoiceitems.description')
-                                        ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                        ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                        ->get();
-                                    
-                                    foreach ($productsOrder as $productOrder) {
-                                        $explodProduct = explode(' - ', $productOrder->description, 2);
-                                        $productInfo[] = $explodProduct[0];
-                                    }
-                                    
-                                    if (!empty($productInfo)) {
-                                        $products = Capsule::table('tblproducts')
-                                            ->whereIn('name', $productInfo)
-                                            ->get(['name', 'qty'])
-                                            ->all();
+                                $this->handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, "Failure");
 
-                                        for ($i = 0; $i < count($products); $i++) {
-                                            $productData[$i]["name"] = $products[$i]->name;
-                                            $productData[$i]["qty"] =  $products[$i]->qty + 1;
-                                        }
-
-                                        for ($j = 0; $j < count($productData); $j++) {
-                                            Capsule::table('tblproducts')
-                                                ->where('name', "=", $productData[$j]["name"])
-                                                ->update(['qty' => $productData[$j]["qty"]]);
-                                        }
-                                    }
-
-                                    if ($invoice['status'] != 'Cancelled') {
-                                        $message = 'PendingOrder';
-                                        $results = localAPI($message, $postData, $adminUsername);
-                                    }
-                                    
-                                    // Mark as processed
-                                    Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
+                                if ($invoice['status'] != 'Cancelled') {
+                                    $message = 'PendingOrder';
+                                    $results = localAPI($message, $postData, $adminUsername);
                                 }
                             }
                             break;
                         case 4: {
-                                // Check for duplicates
-                                $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
                                 
-                                if ($result && !$alreadyProcessed) {
-                                    //failed - restore stock
-                                    logTransaction($GATEWAY['name'], $validationData, "Failure");
 
-                                    $productInfo = array();
-                                    $productData = array();
-                                    
-                                    $productsOrder = Capsule::table('tblinvoiceitems')
-                                        ->select('tblinvoiceitems.description')
-                                        ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                        ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                        ->get();
-                                    
-                                    foreach ($productsOrder as $productOrder) {
-                                        $explodProduct = explode(' - ', $productOrder->description, 2);
-                                        $productInfo[] = $explodProduct[0];
-                                    }
-                                    
-                                    if (!empty($productInfo)) {
-                                        $products = Capsule::table('tblproducts')
-                                            ->whereIn('name', $productInfo)
-                                            ->get(['name', 'qty'])
-                                            ->all();
+                                $this->handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, "Failure");
 
-                                        for ($i = 0; $i < count($products); $i++) {
-                                            $productData[$i]["name"] = $products[$i]->name;
-                                            $productData[$i]["qty"] =  $products[$i]->qty + 1;
-                                        }
-
-                                        for ($j = 0; $j < count($productData); $j++) {
-                                            Capsule::table('tblproducts')
-                                                ->where('name', "=", $productData[$j]["name"])
-                                                ->update(['qty' => $productData[$j]["qty"]]);
-                                        }
-                                    }
-
-                                    if ($invoice['status'] != 'Cancelled') {
-                                        $message = 'PendingOrder';
-                                        $results = localAPI($message, $postData, $adminUsername);
-                                    }
-                                    
-                                    // Mark as processed
-                                    Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
+                                if ($invoice['status'] != 'Cancelled') {
+                                    $message = 'PendingOrder';
+                                    $results = localAPI($message, $postData, $adminUsername);
                                 }
                             }
                             break;
                         case 6: {
-                                // Check for duplicates
-                                $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                
-                                if ($result && !$alreadyProcessed) {
-                                    //pending - restore stock
-                                    logTransaction($GATEWAY['name'], $validationData, "Failure");
+                               
+                                $this->handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, "Failure");
 
-                                    $productInfo = array();
-                                    $productData = array();
-                                    
-                                    $productsOrder = Capsule::table('tblinvoiceitems')
-                                        ->select('tblinvoiceitems.description')
-                                        ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                        ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                        ->get();
-                                    
-                                    foreach ($productsOrder as $productOrder) {
-                                        $explodProduct = explode(' - ', $productOrder->description, 2);
-                                        $productInfo[] = $explodProduct[0];
-                                    }
-                                    
-                                    if (!empty($productInfo)) {
-                                        $products = Capsule::table('tblproducts')
-                                            ->whereIn('name', $productInfo)
-                                            ->get(['name', 'qty'])
-                                            ->all();
-
-                                        for ($i = 0; $i < count($products); $i++) {
-                                            $productData[$i]["name"] = $products[$i]->name;
-                                            $productData[$i]["qty"] =  $products[$i]->qty + 1;
-                                        }
-
-                                        for ($j = 0; $j < count($productData); $j++) {
-                                            Capsule::table('tblproducts')
-                                                ->where('name', "=", $productData[$j]["name"])
-                                                ->update(['qty' => $productData[$j]["qty"]]);
-                                        }
-                                    }
-
-                                    if ($invoice['status'] != 'Cancelled') {
-                                        $message = 'PendingOrder';
-                                        $results = localAPI($message, $postData, $adminUsername);
-                                    }
-                                    
-                                    // Mark as processed
-                                    Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
+                                if ($invoice['status'] != 'Cancelled') {
+                                    $message = 'PendingOrder';
+                                    $results = localAPI($message, $postData, $adminUsername);
                                 }
                             }
                             break;
                         case 10: {
-                                // Check for duplicates
-                                $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                
-                                if ($result && !$alreadyProcessed) {
-                                    //pending - restore stock
-                                    logTransaction($GATEWAY['name'], $validationData, "Failure");
+                              
 
-                                    $productInfo = array();
-                                    $productData = array();
-                                    
-                                    $productsOrder = Capsule::table('tblinvoiceitems')
-                                        ->select('tblinvoiceitems.description')
-                                        ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                        ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                        ->get();
-                                    
-                                    foreach ($productsOrder as $productOrder) {
-                                        $explodProduct = explode(' - ', $productOrder->description, 2);
-                                        $productInfo[] = $explodProduct[0];
-                                    }
-                                    
-                                    if (!empty($productInfo)) {
-                                        $products = Capsule::table('tblproducts')
-                                            ->whereIn('name', $productInfo)
-                                            ->get(['name', 'qty'])
-                                            ->all();
+                                $this->handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, "Failure");
 
-                                        for ($i = 0; $i < count($products); $i++) {
-                                            $productData[$i]["name"] = $products[$i]->name;
-                                            $productData[$i]["qty"] =  $products[$i]->qty + 1;
-                                        }
-
-                                        for ($j = 0; $j < count($productData); $j++) {
-                                            Capsule::table('tblproducts')
-                                                ->where('name', "=", $productData[$j]["name"])
-                                                ->update(['qty' => $productData[$j]["qty"]]);
-                                        }
-                                    }
-
-                                    if ($invoice['status'] != 'Cancelled') {
-                                        $message = 'PendingOrder';
-                                        $results = localAPI($message, $postData, $adminUsername);
-                                    }
-                                    
-                                    // Mark as processed
-                                    Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
+                                if ($invoice['status'] != 'Cancelled') {
+                                    $message = 'PendingOrder';
+                                    $results = localAPI($message, $postData, $adminUsername);
                                 }
                             }
                             break;
                         case 11: {
-                                // Check for duplicates
-                                $result = Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->first();
-                                $alreadyProcessed = ($result && $result->momento === '0000-00-00 00:00:00');
-                                
-                                if ($result && !$alreadyProcessed) {
-                                    //pending - restore stock
-                                    logTransaction($GATEWAY['name'], $validationData, "Failure");
+                               
 
-                                    $productInfo = array();
-                                    $productData = array();
-                                    
-                                    $productsOrder = Capsule::table('tblinvoiceitems')
-                                        ->select('tblinvoiceitems.description')
-                                        ->where('tblinvoiceitems.invoiceid', '=', $validationData['x_extra1'])
-                                        ->where('tblinvoiceitems.type', '=', 'Hosting')
-                                        ->get();
-                                    
-                                    foreach ($productsOrder as $productOrder) {
-                                        $explodProduct = explode(' - ', $productOrder->description, 2);
-                                        $productInfo[] = $explodProduct[0];
-                                    }
-                                    
-                                    if (!empty($productInfo)) {
-                                        $products = Capsule::table('tblproducts')
-                                            ->whereIn('name', $productInfo)
-                                            ->get(['name', 'qty'])
-                                            ->all();
+                                $this->handleFailedTransaction($mp_transaction, $GATEWAY, $validationData, "Failure");
 
-                                        for ($i = 0; $i < count($products); $i++) {
-                                            $productData[$i]["name"] = $products[$i]->name;
-                                            $productData[$i]["qty"] =  $products[$i]->qty + 1;
-                                        }
-
-                                        for ($j = 0; $j < count($productData); $j++) {
-                                            Capsule::table('tblproducts')
-                                                ->where('name', "=", $productData[$j]["name"])
-                                                ->update(['qty' => $productData[$j]["qty"]]);
-                                        }
-                                    }
-
-                                    if ($invoice['status'] != 'Cancelled') {
-                                        $message = 'PendingOrder';
-                                        $results = localAPI($message, $postData, $adminUsername);
-                                    }
-                                    
-                                    // Mark as processed
-                                    Capsule::table("bapp_epayco")->where("transaccion", "=", $mp_transaction)->update(['momento' => '0000-00-00 00:00:00']);
+                                if ($invoice['status'] != 'Cancelled') {
+                                    $message = 'PendingOrder';
+                                    $results = localAPI($message, $postData, $adminUsername);
                                 }
                             }
                             break;
@@ -1151,26 +930,26 @@ class EpaycoConfig
         if (function_exists('iconv')) {
             $string = iconv('UTF-8', 'ASCII//TRANSLIT', $string);
         }
-        
+
         $strip = array("~", "`", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "=", "+", "[", "{", "]", "}", "\\", "|", ";", ":", "\"", "'", "&#8216;", "&#8217;", "&#8220;", "&#8221;", "&#8211;", "&#8212;", "â€”", "â€“", ",", "<", ".", ">", "/", "?", "-");
         $clean = trim(str_replace($strip, "", strip_tags($string)));
         $clean = preg_replace('/\s+/', ' ', $clean);
         $clean = ($anal) ? preg_replace("/[^a-zA-Z0-9]/", "", $clean) : $clean;
         return $clean;
     }
-    
+
     function normalizeDecimalValue($value)
     {
         // Remove spaces and trim
         $value = trim($value);
-        
+
         // Remove currency symbols and letters
         $value = preg_replace('/[^0-9.,]/', '', $value);
-        
+
         // Count occurrences of dots and commas
         $dotCount = substr_count($value, '.');
         $commaCount = substr_count($value, ',');
-        
+
         // Determine the decimal separator based on format
         if ($dotCount == 0 && $commaCount == 1) {
             // Format: "1234,56" - comma is decimal separator (European without thousands)
@@ -1189,11 +968,11 @@ class EpaycoConfig
             // Format: "1,234,567" - commas are thousand separators (US), no decimal
             $value = str_replace(',', '', $value);
         }
-        
+
         // Convert to float
         return floatval($value);
     }
-    
+
     function epayco_getAdminUserWithApiAccess()
     {
         try {
