@@ -468,7 +468,7 @@ class EpaycoConfig
     {
         $bearer_token = $this->ePaycoToken($gateway);
         $publicKey = $gateway['publicKey'];
-        $url = "https://secure.payco.co/transaction/response.json?ref_payco=" . $transaction . "&&public_key=" . $publicKey;
+        $url = "https://eks-rest-pagos-service.epayco.io/transaction/response.json?ref_payco=" . $transaction . "&&public_key=" . $publicKey;
         return $this->makeRequest($gateway, [], $url, "Bearer " . $bearer_token);
     }
     function makeRequest($gateway, $data, $url, $bearerToken = false)
