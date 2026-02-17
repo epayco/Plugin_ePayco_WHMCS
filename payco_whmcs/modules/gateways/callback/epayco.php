@@ -1,4 +1,4 @@
-<?php
+ <?php
 include "../../../init.php";
 include ROOTDIR . "/includes/functions.php";
 include ROOTDIR . "/includes/gatewayfunctions.php";
@@ -21,18 +21,29 @@ if($_GET['ref_payco'] === 'undefined'){
     $returnUrl = $gatewayParams['systemurl'];
 }
 $obj = new EpaycoConfig("Epayco",$gatewayModule);
+
+
 if(!empty($_GET['ref_payco'])){
-    $responseData = @file_get_contents('https://eks-checkout-service.epayco.io/validation/v1/reference/'.$_GET['ref_payco']);
+    $url = 'https://eks-checkout-service.epayco.io/validation/v1/reference/'.$_GET['ref_payco'];
+    $responseData = @file_get_contents($url);
     if($responseData === false){
+        echo "<pre>ERROR: No se pudo obtener respuesta de la API</pre>";
         logTransaction($gatewayParams['name'], $_GET, 'Ocurrio un error al intentar validar la referencia');
         header("Location: ".$gatewayParams['systemurl']);
     }
     $jsonData = @json_decode($responseData, true);
+   
     $validationData = $jsonData['data'];
+  
     $obj->crearTablaCustomTransacciones();
+    echo "<pre>Procesando confirmación...</pre>";
     $respuesta = $obj->epaycoConfirmation($GATEWAY, $validationData);
+   
     $returnUrl = $gatewayParams['systemurl'].'modules/gateways/epayco/response.php';
-    header("Location: ".$returnUrl.'?ref_payco='.$_GET['ref_payco']);
+    $fullRedirectUrl = $returnUrl.'?ref_payco='.$_GET['ref_payco'];
+    echo "<pre>Redirigiendo...</pre>";
+    echo "<script>setTimeout(function(){ window.location.href = '".$fullRedirectUrl."'; }, 3000);</script>";
+    header("Location: ".$fullRedirectUrl);
 }else {
     if (!empty(trim($_REQUEST['x_ref_payco']))) {
         $validationData = $_REQUEST;
@@ -43,5 +54,3 @@ if(!empty($_GET['ref_payco'])){
         exit("Callback completo: " . var_export(200,1));
     }
 }
-
-
