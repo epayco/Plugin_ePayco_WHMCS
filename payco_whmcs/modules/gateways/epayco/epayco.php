@@ -230,18 +230,18 @@ class EpaycoConfig
         $address1 = $params['clientdetails']['address1'];
         $returnUrl = $params['returnurl'];
         $billing_name = $firstname . " " . $lastname;
-        if ($params['currencyCode'] == 'default') {
-            $clientDetails = localAPI("getclientsdetails", ["clientid" => $params['clientdetails']['userid'], "responsetype" => "json"], $params['WHMCSAdminUser']);
-            $currencyCode = strtolower($clientDetails['currency_code']);
-        } else {
-            $currencyCode = $params['currencyCode'];
-        }
 
         $testMode = $params['testMode'] == 'on' ? true : false;
 
         $externalMode = $params['externalMode'] == 'on' ? 'standard' : 'onepage';
 
         $invoice = localAPI("getinvoice", array('invoiceid' => $params['invoiceid']), $params['WHMCSAdminUser']);
+        
+       //Fix checkout currency detection by using invoice currency instead of gateway configuration
+        $currencyCode = strtolower($params['currency']);
+        if (empty($currencyCode)) {
+            $currencyCode = 'cop'; // fallback
+        }
         $invoiceData = Capsule::table('tblorders')
             ->select('tblorders.id')
             ->where('tblorders.invoiceid', '=', $params['invoiceid'])
