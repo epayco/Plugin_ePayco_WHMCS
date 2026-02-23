@@ -265,7 +265,7 @@ class EpaycoConfig
         } else {
             $epaycoButtonImage = 'https://multimedia.epayco.co/epayco-landing/btns/Boton-epayco-color1.png';
         }
-        $ip = $this->getCustomerIp();
+       // $ip = $this->getCustomerIp();
         $logo = $params['systemurl'] . '/modules/gateways/epayco/logo.png';
         $code = "<img src=" . $logo . " /><br><a href='" . $enlace . "' class='btn btn-" . $color . "'>" . $bh_texto . "</a>" . $nota;
         $tokenResponse = $this->epaycoBerarToken(
@@ -295,7 +295,6 @@ class EpaycoConfig
                 "email" => $email,
             ],
             "autoclick" => true,
-            "ip" => $ip,
             "test" => $testMode,
             "extras" => [
                 "extra1" => (string)$params['invoiceid'],
