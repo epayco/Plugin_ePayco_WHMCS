@@ -5,23 +5,55 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-es/1.0.0/),
 y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [8.4.0] - 23 de febrero de 2026
 
 ### Changed
 
-- **23 de octubre de 2025** - Actualización para versión 2 del checkout de ePayco
-  - Actualizado el endpoint de validación para usar el nuevo servicio `eks-checkout-service.epayco.io`
+- **Actualización para versión 2 del checkout de ePayco**
+
   - Mejorada la configuración del callback para compatibilidad con checkout v2
   - Optimizada la gestión de referencias de pago y validación de transacciones
   - Actualizada la URL de validación en `callback/epayco.php` para usar el nuevo endpoint
   - Corregida la integración con el sistema de validación de referencias
+                                                                       - **Manejo de moneda (Oculta en configuración):**
+  - La moneda se toma únicamente desde la factura
+  - Se oculta la opción de moneda en la interfaz de configuración
+  - Eliminada la capacidad de seleccionar moneda manualmente
+
+- **Formato de valores mejorado:**
+  - Normalización a 2 decimales exactos
+  - Eliminación de separadores de miles
+  - Garantizada compatibilidad con validaciones de la pasarela
 
 ### Added
 
-- **Nuevos endpoints y servicios:**
-  - Integración con `eks-checkout-service.epayco.io/validation/v1/reference/` para validación mejorada
-  - Soporte mejorado para el manejo de `ref_payco` y `x_ref_payco`
-  - Sistema de redirección mejorado para respuestas de pago
+
+- **Gestión mejorada de inventario:**
+  - Aceptado → Reduce inventario
+  - Fallida → Restaura inventario
+  - Pendiente → Restaura inventario
+  - Cancelada → Restaura inventario
+  - Rechazada → Restaura inventario
+  - Abandonada → Restaura inventario
+  - Reintento de pago → Restaura inventario antes de generar nueva transacción
+
+- **Prevención de pagos duplicados:**
+  - Validación de `transaction_id` único en cada transacción
+  - Se ignoran callbacks repetidos (idempotencia)
+  - No se duplica el registro del pago ni el movimiento de inventario
+  - Sistema de detección de transacciones previamente procesadas
+
+- **Sanitización mejorada de datos:**
+  - Se limita la longitud del nombre del producto
+  - Se limita la longitud de la descripción
+  - Se eliminan caracteres inválidos y etiquetas HTML
+  - Prevención de inyección de datos maliciosos
+
+- **Manejo mejorado de errores en checkout:**
+  - Se muestran errores de sesión al usuario de forma clara
+  - Evita recargas silenciosas de la página
+  - Facilita el diagnóstico de fallos
+  - Mensajes de error informativos para el usuario final
 
 ### Technical Details
 
@@ -31,11 +63,38 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
   - Mejorado el sistema de logging para transacciones fallidas
   - Actualizada la gestión de respuestas HTTP y códigos de estado
 
+- **Implementación de control de inventario:**
+  - Lógica de gestión de inventario basada en estados de transacción
+  - Sistema de transacciones de inventario reversibles
+  - Tracking de cambios de inventario en auditoría
+
+- **Implementación de idempotencia:**
+  - Sistema de detección y almacenamiento de `transaction_id`
+  - Tabla de transacciones procesadas para evitar duplicados
+  - Validación de integridad de datos en callbacks
+
+- **Sanitización y validación de datos:**
+  - Filtrado y validación de longitudes de strings
+  - Eliminación de caracteres especiales y HTML
+  - Implementación de regex para caracteres válidos
+
+- **Mejoras en formato de moneda:**
+  - Función de normalización de decimales
+  - Validación de formato antes de envío a pasarela
+
 ### Security
 
 - Implementado manejo robusto de errores en validaciones de API
 - Mejorada la validación de respuestas antes de procesar datos de transacciones
 - Fortalecido el sistema de logging para audit trail de transacciones
+
+- **Seguridad en procesamiento de transacciones:**
+  - Prevención de ataques de replay mediante validación de `transaction_id`
+  - Protección contra inyección de datos en campos de producto y descripción
+  - Validación de límites de datos para prevenir buffer overflow
+  - Implementación de checksums para integridad de datos
+
+## [Unreleased]
 
 ## [Previous Versions]
 

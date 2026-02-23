@@ -26,7 +26,7 @@
 
 
     if (!empty($_GET['ref_payco'])) {
-        $url = 'https://eks-checkout-service.epayco.io/validation/v1/reference/' . $_GET['ref_payco'];
+        $url = 'https://secure.epayco.co/validation/v1/reference/' . $_GET['ref_payco'];
         $responseData = @file_get_contents($url);
         if ($responseData === false) {
             error_log("EPAYCO CALLBACK: file_get_contents FAILED", 0);
